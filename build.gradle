@@ -1,6 +1,16 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    id "org.sonarqube" version "6.2.0.5505"
+}
+
+sonarqube {
+    properties {
+        property "sonar.projectKey", "miladirhm_devopsprojectf_237fe10f-6e9e-49b4-bf81-4c7ce4d62559"
+        property "sonar.projectName", "DevopsProjectF"
+        property "sonar.host.url", "http://host.docker.internal:9000"   // <-- supprime la virgule
+        property "sonar.token", "sqp_e95c658a8c1979c518aa73ed79c61519a6fa8d2a"
+        property "sonar.qualitygate.wait", true
+    }
 }
