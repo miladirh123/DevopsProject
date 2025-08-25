@@ -72,11 +72,14 @@ build-sonar:
 
   script:
     - echo "Start SonarQube Analysis"
+    - ./gradlew lintDebug
     # Assure-toi que le plugin Sonar est installé dans build.gradle
-    - ./gradlew sonarqube \
+    - ./gradlew sonar \
         -Dsonar.login=$SONAR_TOKEN \
         -Dsonar.host.url=$SONAR_HOST_URL \
         --stacktrace --info
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml
+
 
   allow_failure: false   # Passe à true si tu veux que l'échec n'arrête pas le pipeline
   rules:
