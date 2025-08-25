@@ -8,10 +8,13 @@ plugins {
     id "org.sonarqube" version "6.2.0.5505"
 }
 
-sonar {
+sonarqube {
     properties {
         property "sonar.projectKey", "miladirahma6_devopsprojectf_c2e869a7-0e7a-40bc-845b-1b4c09a1f167"
         property "sonar.projectName", "DevopsProjectF"
+        property "sonar.host.url", "http://host.docker.internal:9000"   // <-- supprime la virgule
+        property "sonar.token", "sqp_c24736c42d9d61b2739495f5423b3b476eff507c"
         property "sonar.qualitygate.wait", true
     }
+
 }
