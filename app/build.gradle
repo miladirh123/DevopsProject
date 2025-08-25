@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace 'com.example.devopsproject'
-    compileSdk 36
+    compileSdkVersion 36
 
     defaultConfig {
         applicationId "com.example.devopsproject"
