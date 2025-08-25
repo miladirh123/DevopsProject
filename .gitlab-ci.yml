@@ -59,8 +59,7 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
-# SonarQube
-image: gradle:8.10.0-jdk17-jammy
+
 
 variables:
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
