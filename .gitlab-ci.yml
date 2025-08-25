@@ -59,23 +59,29 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
-
-
 build-sonar:
   stage: build-sonar
-  
-  
   cache:
     policy: pull-push
     key: "sonar-cache-$CI_COMMIT_REF_SLUG"
     paths:
       - "${SONAR_USER_HOME}/cache"
-      - sonar-scanner/
-      
-  script: gradle sonar
-  allow_failure: true
+
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+
+  script:
+    - echo "Start SonarQube Analysis"
+    # Assure-toi que le plugin Sonar est installé dans build.gradle
+    - ./gradlew sonarqube \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        --stacktrace --info
+
+  allow_failure: false   # Passe à true si tu veux que l'échec n'arrête pas le pipeline
   rules:
     - when: always
+
 
 # Lint
 lint_check:
