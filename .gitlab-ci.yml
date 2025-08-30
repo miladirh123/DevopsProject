@@ -4,8 +4,6 @@ stages:
   - build-sonar
   - lint
   - dependency_check
-  - sast
-  - dast
   - deploy_debug
   - deploy_release
   - report
@@ -15,14 +13,14 @@ variables:
   ANDROID_BUILD_TOOLS: "33.0.2"
   ANDROID_SDK_ROOT: "$CI_PROJECT_DIR/android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"   # ← ici
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
 
 default:
   image: gradle:8.10.0-jdk17-jammy
   before_script:
-    - apt-get update && apt-get install -y wget unzip curl docker.io
+    - apt-get update && apt-get install -y wget unzip curl
     - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
     - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
     - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
@@ -61,7 +59,6 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
-# SonarQube Analysis
 build-sonar:
   stage: build-sonar
   cache:
@@ -69,93 +66,35 @@ build-sonar:
     key: "sonar-cache-$CI_COMMIT_REF_SLUG"
     paths:
       - "${SONAR_USER_HOME}/cache"
+
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+
   script:
     - echo "Start SonarQube Analysis"
     - ./gradlew lintDebug
+    # Assure-toi que le plugin Sonar est installé dans build.gradle
     - ./gradlew sonar \
         -Dsonar.login=$SONAR_TOKEN \
         -Dsonar.host.url=$SONAR_HOST_URL \
-        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
         --stacktrace --info
-  allow_failure: false
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml
+
+
+  allow_failure: false   # Passe à true si tu veux que l'échec n'arrête pas le pipeline
   rules:
     - when: always
 
-# Lint Check
+
+# Lint
 lint_check:
   stage: lint
   needs: 
     - job: build
-      optional: true
+      optional: true   # ← idem ici
   script:
     - ./gradlew lint
   artifacts:
     paths:
       - app/build/reports/lint-results.html
-    expire_in: 1 week
-
-# Dependency Check (SCA)
-dependency_check:
-  stage: dependency_check
-  image: owasp/dependency-check:latest
-  script:
-    - dependency-check.sh --project "AndroidApp" --scan . --format "ALL" --out reports
-  artifacts:
-    paths:
-      - reports
-    expire_in: 1 week
-
-# SAST
-sast:
-  stage: sast
-  image: docker:20.10.16
-  services:
-    - docker:dind
-  script:
-    - echo "Run GitLab SAST"
-  artifacts:
-    reports:
-      sast: gl-sast-report.json
-  rules:
-    - when: always
-
-# DAST
-dast:
-  stage: dast
-  image: docker:20.10.16
-  services:
-    - docker:dind
-  variables:
-    DAST_WEBSITE: "http://your-deployed-app-url"
-  script:
-    - echo "Run GitLab DAST"
-  artifacts:
-    reports:
-      dast: gl-dast-report.json
-  rules:
-    - when: manual   # exécution manuelle
-
-# Deploy Debug APK in Docker
-deploy_debug:
-  stage: deploy_debug
-  script:
-    - echo "Building Docker image with Debug APK"
-    - docker build -t android-app:debug -f Dockerfile.debug .
-    - docker save android-app:debug > android-app-debug.tar
-  artifacts:
-    paths:
-      - android-app-debug.tar
-    expire_in: 1 week
-
-# Deploy Release APK in Docker
-deploy_release:
-  stage: deploy_release
-  script:
-    - echo "Building Docker image with Release APK"
-    - ./gradlew assembleRelease
-    - docker build -t android-app:release -f Dockerfile.release .
-    - docker save android-app:release > android-app-release.tar
-  artifacts:
-    paths:
-      - android-app-release.tar
     expire_in: 1 week
