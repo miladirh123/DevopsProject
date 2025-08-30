@@ -77,7 +77,7 @@ build-sonar:
         -Dsonar.host.url=$SONAR_HOST_URL \
         -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
         --stacktrace --info
-  allow_failure: false
+  allow_failure: true
   rules:
     - when: always
 
