@@ -13,14 +13,14 @@ variables:
   ANDROID_BUILD_TOOLS: "33.0.2"
   ANDROID_SDK_ROOT: "$CI_PROJECT_DIR/android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false"   # ← ici
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
 
 default:
   image: gradle:8.10.0-jdk17-jammy
   before_script:
-    - apt-get update && apt-get install -y wget unzip curl
+    - apt-get update && apt-get install -y wget unzip curl docker.io
     - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
     - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
     - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
@@ -47,7 +47,7 @@ build:
 # Unit Tests
 unit_test:
   stage: test
-  needs: 
+  needs:
     - job: build
       optional: true
   script:
@@ -59,6 +59,7 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
+# SonarQube Analysis
 build-sonar:
   stage: build-sonar
   cache:
@@ -66,35 +67,82 @@ build-sonar:
     key: "sonar-cache-$CI_COMMIT_REF_SLUG"
     paths:
       - "${SONAR_USER_HOME}/cache"
-
   variables:
     SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
-
   script:
     - echo "Start SonarQube Analysis"
     - ./gradlew lintDebug
-    # Assure-toi que le plugin Sonar est installé dans build.gradle
     - ./gradlew sonar \
         -Dsonar.login=$SONAR_TOKEN \
         -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
         --stacktrace --info
-        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml
-
-
-  allow_failure: false   # Passe à true si tu veux que l'échec n'arrête pas le pipeline
+  allow_failure: false
   rules:
     - when: always
-
 
 # Lint
 lint_check:
   stage: lint
-  needs: 
+  needs:
     - job: build
-      optional: true   # ← idem ici
+      optional: true
   script:
     - ./gradlew lint
   artifacts:
     paths:
       - app/build/reports/lint-results.html
     expire_in: 1 week
+
+# Dependency Check (SAST)
+sast_check:
+  stage: dependency_check
+  image: owasp/dependency-check:latest
+  script:
+    - echo "Start Dependency Check"
+    - dependency-check.sh --project MyApp --scan ./app --format "HTML" --out reports/dependency-check
+  artifacts:
+    paths:
+      - reports/dependency-check/
+    expire_in: 1 week
+  allow_failure: true
+
+# DAST (ZAP Scan)
+dast_scan:
+  stage: dependency_check
+  image: owasp/zap2docker-stable
+  script:
+    - echo "Start DAST Scan"
+    - zap-baseline.py -t http://my-app-url:8080 -r reports/zap_report.html
+  artifacts:
+    paths:
+      - reports/zap_report.html
+    expire_in: 1 week
+  allow_failure: true
+
+# Deploy Debug in Docker
+deploy_debug:
+  stage: deploy_debug
+  script:
+    - echo "Deploy Debug APK to Docker container"
+    - docker build -t myapp:debug .
+    - docker run -d --name myapp_debug myapp:debug
+  only:
+    - ma-branche
+
+# Deploy Release in Docker
+deploy_release:
+  stage: deploy_release
+  script:
+    - echo "Deploy Release APK to Docker container"
+    - docker build -t myapp:release .
+    - docker run -d --name myapp_release myapp:release
+  only:
+    - main
+
+# Final Report
+report:
+  stage: report
+  script:
+    - echo "Pipeline finished. Collecting reports..."
+    - ls -R app/build/reports || true
