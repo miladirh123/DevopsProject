@@ -123,12 +123,13 @@ dast_scan:
 # Deploy Debug in Docker
 deploy_debug:
   stage: deploy_debug
+  dependencies:
+    - build   # pour récupérer l'APK généré
   script:
-    - echo "Deploy Debug APK to Docker container"
     - docker build -t myapp:debug .
-    - docker run -d --name myapp_debug myapp:debug
-  only:
-    - ma-branche
+  rules:
+    - when: always
+
 
 # Deploy Release in Docker
 deploy_release:
