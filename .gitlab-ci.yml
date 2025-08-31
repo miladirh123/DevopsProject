@@ -16,6 +16,7 @@ variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
+  JAVA_HOME: "/usr/local/openjdk-17"
 
 default:
   image: gradle:8.10.0-jdk17-jammy
@@ -30,16 +31,19 @@ default:
     - yes | sdkmanager --licenses || true
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
+    - export PATH=$JAVA_HOME/bin:$PATH
 
 # Build APK
 build:
   stage: build
+  image: gradle:jdk17
   script:
-    - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
-    - ./gradlew assembleRelease
+    - if [ -n "$KEYSTORE_FILE" ]; then echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore; fi
+    - ./gradlew clean assembleRelease --stacktrace --info
+    - ls -R app/build/outputs/apk/release/
   artifacts:
     paths:
-      - app/build/outputs/apk/release/app-release.apk
+      - app/build/outputs/apk/release/
     expire_in: 1 week
 
 # Unit Tests
@@ -110,6 +114,7 @@ docker_build:
     - build
   script:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - cp app/build/outputs/apk/release/app-release.apk .   # Copier l'APK généré
     - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
     - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
   rules:
@@ -124,6 +129,7 @@ deploy_release:
   dependencies:
     - build
   script:
+    - cp app/build/outputs/apk/release/app-release.apk .   # Copier l'APK généré
     - docker build -t myapp:release .
     - docker run -d --name myapp_release myapp:release
   rules:
