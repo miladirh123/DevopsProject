@@ -16,6 +16,7 @@ variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
+  JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"  # Important pour sdkmanager
 
 default:
   image: gradle:8.10.0-jdk17-jammy
@@ -31,28 +32,23 @@ default:
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
 
-
-
-
+# Build Release APK
 build:
   stage: build
-  image: gradle:jdk17
   script:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
   artifacts:
     paths:
-      - app/build/outputs/apk/release/app-release.apk
-
+      # Vérifie si ton Gradle génère un unsigned ou signed APK
+      - app/build/outputs/apk/release/app-release-unsigned.apk
+    expire_in: 1 hour
 
 # Unit Tests
 unit_test:
   stage: test
-  needs:
-    - job: build
-      optional: true
+  needs: [build]
   script:
-    - echo "Start Unit Tests"
     - ./gradlew testDebugUnitTest --stacktrace --info
   artifacts:
     paths:
@@ -68,26 +64,18 @@ build-sonar:
     key: "sonar-cache-$CI_COMMIT_REF_SLUG"
     paths:
       - "${SONAR_USER_HOME}/cache"
-  variables:
-    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   script:
-    - echo "Start SonarQube Analysis"
     - ./gradlew lintDebug
     - ./gradlew sonar \
         -Dsonar.login=$SONAR_TOKEN \
         -Dsonar.host.url=$SONAR_HOST_URL \
-        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
-        --stacktrace --info
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml
   allow_failure: true
-  rules:
-    - when: always
 
 # Lint
 lint_check:
   stage: lint
-  needs:
-    - job: build
-      optional: true
+  needs: [build]
   script:
     - ./gradlew lint
   artifacts:
@@ -100,7 +88,6 @@ sast_check:
   stage: dependency_check
   image: owasp/dependency-check:latest
   script:
-    - echo "Start Dependency Check"
     - dependency-check.sh --project MyApp --scan ./app --format "HTML" --out reports/dependency-check
   artifacts:
     paths:
@@ -111,14 +98,13 @@ sast_check:
 # Deploy Debug in Docker
 docker_build:
   stage: deploy_debug
-  image: gradle:8.10.0-jdk17-jammy
+  image: docker:24.0.5
   services:
     - docker:dind
-  needs:
-    - job: build   # récupère l'APK généré
+  needs: [build]
   script:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
-    - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
+    - docker build -f docker/Dockerfile -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
     - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
   rules:
     - when: always
@@ -129,15 +115,12 @@ deploy_release:
   image: docker:24.0.5
   services:
     - docker:dind
-  needs:
-    - job: build   # idem: récupère l'artifact du build
+  needs: [build]
   script:
-    - echo "Deploy Release APK to Docker container"
     - docker build -f docker/Dockerfile -t mon-apk:latest .
     - docker run -d --name myapp_release mon-apk:latest
   rules:
     - when: always
-
 
 # Final Report
 report:
