@@ -28,9 +28,11 @@ default:
     - mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
     - rm cmdtools.zip
     - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+    - export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo /usr/local/openjdk-17)
     - yes | sdkmanager --licenses || true
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
+
 
 # Build Release APK
 build:
