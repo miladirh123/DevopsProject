@@ -29,13 +29,14 @@ before_script:
 
 stages:
   - build
+  - lint
   - test
   - build-sonar
-  - lint
   - dependency_check
   - deploy_debug
   - deploy_release
   - report
+
 
 # Lint Debug
 lintDebug:
