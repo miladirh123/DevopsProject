@@ -1,10 +1,12 @@
-# Dockerfile pour déployer l'APK debug
-FROM openjdk:17-jdk-slim
+# Utiliser une image de base avec JDK et Android SDK
+FROM openjdk:17
 
+# Installer dépendances nécessaires
+RUN apt-get update && apt-get install -y unzip wget
+
+# Copier l'APK généré depuis GitLab CI
 WORKDIR /app
+COPY build/outputs/apk/release/app-release.apk /app/app-release.apk
 
-# Copier l'APK généré par Gradle
-COPY app/build/outputs/apk/debug/app-debug.apk /app/
-
-# Commande par défaut pour vérifier l'image
-CMD ["ls", "-l", "/app"]
+# Commande par défaut (ex: afficher la taille de l’APK)
+CMD ["ls", "-lh", "app-release.apk"]
