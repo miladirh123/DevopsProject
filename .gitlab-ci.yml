@@ -32,17 +32,18 @@ default:
     - chmod +x ./gradlew
 
 # Build APK
+
+
 build:
   stage: build
+  image: gradle:jdk17
   script:
-    - echo "Start Build APK"
-    - ./gradlew clean assembleDebug --stacktrace --info
+    - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
+    - ./gradlew assembleRelease
   artifacts:
     paths:
-      - app/build/outputs/
-    expire_in: 1 week
-  rules:
-    - when: always
+      - app/build/outputs/apk/release/app-release.apk
+
 
 # Unit Tests
 unit_test:
@@ -107,28 +108,22 @@ sast_check:
     expire_in: 1 week
   allow_failure: true
 
-# DAST (ZAP Scan)
-dast_scan:
-  stage: dependency_check
-  image: owasp/zap2docker-stable
-  script:
-    - echo "Start DAST Scan"
-    - zap-baseline.py -t http://my-app-url:8080 -r reports/zap_report.html
-  artifacts:
-    paths:
-      - reports/zap_report.html
-    expire_in: 1 week
-  allow_failure: true
 
 # Deploy Debug in Docker
-deploy_debug:
+docker_build:
   stage: deploy_debug
-  dependencies:
-    - build   # pour récupérer l'APK généré
+  image: docker:24.0.5
+  services:
+    - docker:dind
   script:
-    - docker build -t myapp:debug .
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
+    - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
   rules:
     - when: always
+
+
+
 
 
 # Deploy Release in Docker
@@ -138,8 +133,8 @@ deploy_release:
     - echo "Deploy Release APK to Docker container"
     - docker build -t myapp:release .
     - docker run -d --name myapp_release myapp:release
-  only:
-    - main
+  rules:
+    - when: always
 
 # Final Report
 report:
@@ -147,3 +142,5 @@ report:
   script:
     - echo "Pipeline finished. Collecting reports..."
     - ls -R app/build/reports || true
+  rules:
+    - when: always
