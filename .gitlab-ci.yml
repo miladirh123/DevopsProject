@@ -16,38 +16,33 @@ variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
-  JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
-  PATH: "$JAVA_HOME/bin:$PATH"
-
 
 default:
   image: gradle:8.10.0-jdk17-jammy
   before_script:
-  - apt-get update && apt-get install -y wget unzip curl docker.io
-  - export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-  - export PATH=$JAVA_HOME/bin:$PATH
-  - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-  - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
-  - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
-  - mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
-  - rm cmdtools.zip
-  - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-  - yes | sdkmanager --licenses || true
-  - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
+    - apt-get update && apt-get install -y wget unzip curl docker.io
+    - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+    - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
+    - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+    - mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+    - rm cmdtools.zip
+    - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+    - yes | sdkmanager --licenses || true
+    - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
+    - chmod +x ./gradlew
 
-
+# Build APK
 build:
   stage: build
   script:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
-    # Renommer ou copier l'APK pour qu'il corresponde à l'artifact attendu
-    - cp app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release.apk
   artifacts:
     paths:
       - app/build/outputs/apk/release/app-release.apk
-    expire_in: 1 hour
+    expire_in: 1 week
 
+# Unit Tests
 unit_test:
   stage: test
   needs:
@@ -61,6 +56,7 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
+# SonarQube Analysis
 build-sonar:
   stage: build-sonar
   cache:
@@ -79,6 +75,7 @@ build-sonar:
   rules:
     - when: always
 
+# Lint
 lint_check:
   stage: lint
   needs:
@@ -91,6 +88,7 @@ lint_check:
       - app/build/reports/lint-results.html
     expire_in: 1 week
 
+# Dependency Check (SAST)
 sast_check:
   stage: dependency_check
   image: owasp/dependency-check:latest
@@ -102,29 +100,34 @@ sast_check:
     expire_in: 1 week
   allow_failure: true
 
+# Deploy Debug in Docker
 docker_build:
   stage: deploy_debug
-  image: gradle:8.10.0-jdk17-jammy
+  image: docker:24.0.2
   services:
     - docker:dind
-  needs:
-    - job: build
+  dependencies:
+    - build
   script:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
     - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
     - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
+  rules:
+    - when: always
 
+# Deploy Release in Docker
 deploy_release:
   stage: deploy_release
-  image: docker:24.0.5
+  image: docker:24.0.2
   services:
     - docker:dind
-  needs:
-    - job: build
+  dependencies:
+    - build
   script:
-    - docker build -f docker/Dockerfile -t mon-apk:latest .
-    - docker run -d --name myapp_release mon-apk:latest
-
+    - docker build -t myapp:release .
+    - docker run -d --name myapp_release myapp:release
+  rules:
+    - when: always
 
 # Final Report
 report:
