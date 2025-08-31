@@ -16,92 +16,130 @@ variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
-  JAVA_HOME: "C:\\Program Files\\Java\\jdk-17"
+  JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"  # Corrigé pour Linux runners
+  PATH: "$JAVA_HOME/bin:$PATH"
 
 default:
-  # Utiliser un shell executor Windows
-  tags:
-    - windows
+  image: gradle:8.10.0-jdk17-jammy
   before_script:
-    - echo "JAVA_HOME is $JAVA_HOME"
-    - set PATH=%JAVA_HOME%\bin;%PATH%
-    - mkdir "%ANDROID_SDK_ROOT%\cmdline-tools"
-    - powershell -Command "Invoke-WebRequest -Uri https://dl.google.com/android/repository/commandlinetools-win-9477386_latest.zip -OutFile cmdtools.zip"
-    - powershell -Command "Expand-Archive -Path cmdtools.zip -DestinationPath $env:ANDROID_SDK_ROOT\cmdline-tools"
-    - powershell -Command "Rename-Item -Path $env:ANDROID_SDK_ROOT\cmdline-tools\cmdline-tools -NewName latest"
-    - del cmdtools.zip
-    - set PATH=%ANDROID_SDK_ROOT%\platform-tools;%ANDROID_SDK_ROOT%\emulator;%ANDROID_SDK_ROOT%\cmdline-tools\latest\bin;%PATH%
-    - sdkmanager --licenses
-    - sdkmanager "platform-tools" "platforms;android-%ANDROID_COMPILE_SDK%" "build-tools;%ANDROID_BUILD_TOOLS%"
-    - chmod +x gradlew
+    - apt-get update && apt-get install -y wget unzip curl docker.io openjdk-17-jdk
+    - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+    - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
+    - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+    - mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+    - rm cmdtools.zip
+    - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+    - yes | sdkmanager --licenses || true
+    - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
+    - chmod +x ./gradlew
 
+# Build APK
 build:
   stage: build
+  image: gradle:jdk17
   script:
-    - if not "%KEYSTORE_FILE%"=="" (echo %KEYSTORE_FILE% | base64 -d > my-release-key.keystore)
+    - if [ -n "$KEYSTORE_FILE" ]; then echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore; fi
     - ./gradlew clean assembleRelease --stacktrace --info
-    - dir app\build\outputs\apk\release
+    - ls -R app/build/outputs/apk/release/  # Vérifier l’APK
   artifacts:
     paths:
-      - app\build\outputs\apk\release\
+      - app/build/outputs/apk/release/
     expire_in: 1 week
 
+# Unit Tests
 unit_test:
   stage: test
   needs:
-    - build
+    - job: build
+      optional: true
   script:
     - ./gradlew testDebugUnitTest --stacktrace --info
   artifacts:
     paths:
-      - app\build\test-results\
-      - app\build\reports\tests\
+      - app/build/test-results/
+      - app/build/reports/tests/
     when: always
 
+# SonarQube Analysis
 build-sonar:
   stage: build-sonar
+  cache:
+    policy: pull-push
+    key: "sonar-cache-$CI_COMMIT_REF_SLUG"
+    paths:
+      - "${SONAR_USER_HOME}/cache"
   script:
     - ./gradlew lintDebug
-    - ./gradlew sonar -Dsonar.login=%SONAR_TOKEN% -Dsonar.host.url=%SONAR_HOST_URL% -Dsonar.androidLint.reportPaths=app\build\reports\lint-results-debug.xml --stacktrace --info
+    - ./gradlew sonar \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
+        --stacktrace --info
   allow_failure: true
+  rules:
+    - when: always
 
+# Lint
 lint_check:
   stage: lint
+  needs:
+    - job: build
+      optional: true
   script:
     - ./gradlew lint
   artifacts:
     paths:
-      - app\build\reports\lint-results.html
+      - app/build/reports/lint-results.html
     expire_in: 1 week
 
+# Dependency Check (SAST)
 sast_check:
   stage: dependency_check
   image: owasp/dependency-check:latest
   script:
-    - dependency-check.bat --project MyApp --scan ./app --format "HTML" --out reports\dependency-check
+    - dependency-check.sh --project MyApp --scan ./app --format "HTML" --out reports/dependency-check
   artifacts:
     paths:
-      - reports\dependency-check\
+      - reports/dependency-check/
     expire_in: 1 week
   allow_failure: true
 
+# Deploy Debug in Docker
 docker_build:
   stage: deploy_debug
+  image: docker:24.0.2
+  services:
+    - docker:dind
+  dependencies:
+    - build
   script:
-    - docker login -u %CI_REGISTRY_USER% -p %CI_REGISTRY_PASSWORD% %CI_REGISTRY%
-    - copy app\build\outputs\apk\release\app-release.apk .
-    - docker build -t %CI_REGISTRY%/%CI_PROJECT_PATH%/app-debug:%CI_COMMIT_SHORT_SHA% .
-    - docker push %CI_REGISTRY%/%CI_PROJECT_PATH%/app-debug:%CI_COMMIT_SHORT_SHA%
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - cp app/build/outputs/apk/release/app-release.apk .  # Copier l’APK
+    - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
+    - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
+  rules:
+    - when: always
 
+# Deploy Release in Docker
 deploy_release:
   stage: deploy_release
+  image: docker:24.0.2
+  services:
+    - docker:dind
+  dependencies:
+    - build
   script:
-    - copy app\build\outputs\apk\release\app-release.apk .
+    - cp app/build/outputs/apk/release/app-release.apk .  # Copier l’APK
     - docker build -t myapp:release .
     - docker run -d --name myapp_release myapp:release
+  rules:
+    - when: always
 
+# Final Report
 report:
   stage: report
   script:
     - echo "Pipeline finished. Collecting reports..."
-    - dir app\build\reports
+    - ls -R app/build/reports || true
+  rules:
+    - when: always
