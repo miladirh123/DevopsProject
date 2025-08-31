@@ -108,13 +108,14 @@ sast_check:
     expire_in: 1 week
   allow_failure: true
 
-
 # Deploy Debug in Docker
 docker_build:
   stage: deploy_debug
   image: gradle:8.10.0-jdk17-jammy
   services:
     - docker:dind
+  needs:
+    - job: build   # récupère l'APK généré
   script:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
     - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
@@ -122,19 +123,21 @@ docker_build:
   rules:
     - when: always
 
-
-
-
-
 # Deploy Release in Docker
 deploy_release:
   stage: deploy_release
+  image: docker:24.0.5
+  services:
+    - docker:dind
+  needs:
+    - job: build   # idem: récupère l'artifact du build
   script:
     - echo "Deploy Release APK to Docker container"
-    - docker build -t myapp:release .
-    - docker run -d --name myapp_release myapp:release
+    - docker build -f docker/Dockerfile -t mon-apk:latest .
+    - docker run -d --name myapp_release mon-apk:latest
   rules:
     - when: always
+
 
 # Final Report
 report:
