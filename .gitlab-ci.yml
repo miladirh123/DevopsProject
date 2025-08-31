@@ -31,7 +31,7 @@ default:
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
 
-# Build APK
+
 
 
 build:
