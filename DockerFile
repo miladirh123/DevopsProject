@@ -1,0 +1,10 @@
+# Dockerfile pour déployer l'APK debug
+FROM openjdk:17-jdk-slim
+
+WORKDIR /app
+
+# Copier l'APK généré par Gradle
+COPY app/build/outputs/apk/debug/app-debug.apk /app/
+
+# Commande par défaut pour vérifier l'image
+CMD ["ls", "-l", "/app"]
