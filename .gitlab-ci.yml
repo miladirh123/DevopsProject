@@ -16,29 +16,33 @@ variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   GIT_DEPTH: "0"
-  JAVA_HOME: "/usr/local/openjdk-17"
+  JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  PATH: "$JAVA_HOME/bin:$PATH"
+
 
 default:
   image: gradle:8.10.0-jdk17-jammy
   before_script:
-    - apt-get update && apt-get install -y wget unzip curl docker.io
-    - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-    - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
-    - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
-    - mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
-    - rm cmdtools.zip
-    - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$JAVA_HOME/bin:$PATH"
-    - yes | sdkmanager --licenses || true
-    - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
-    - chmod +x ./gradlew
+  - apt-get update && apt-get install -y wget unzip curl docker.io
+  - export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+  - export PATH=$JAVA_HOME/bin:$PATH
+  - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+  - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
+  - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+  - mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+  - rm cmdtools.zip
+  - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+  - yes | sdkmanager --licenses || true
+  - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
+
 
 build:
   stage: build
   script:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
-    # Renommer l'APK pour correspondre à l'artifact attendu
-    - mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release.apk
+    # Renommer ou copier l'APK pour qu'il corresponde à l'artifact attendu
+    - cp app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release.apk
   artifacts:
     paths:
       - app/build/outputs/apk/release/app-release.apk
