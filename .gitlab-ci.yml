@@ -112,7 +112,7 @@ sast_check:
 # Deploy Debug in Docker
 docker_build:
   stage: deploy_debug
-  image: docker:24.0.5
+  image: gradle:8.10.0-jdk17-jammy
   services:
     - docker:dind
   script:
