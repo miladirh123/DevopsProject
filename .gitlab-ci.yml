@@ -31,30 +31,26 @@ default:
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
 
-
-
-build:
+# -------------------
+# Build Release APK signé
+# -------------------
+build_release:
   stage: build
-  image: gradle:jdk17
   script:
-    - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
-    - ./gradlew assembleRelease
+    - echo "$KEYSTORE_FILE" | base64 -d > keystore.jks
+    - ./gradlew assembleRelease --stacktrace --info
   artifacts:
-    paths:       
-      - app/build/outputs/apk/**/*.apk
+    paths:
+      - app/build/outputs/apk/release/app-release.apk
     expire_in: 1 week
 
-
-
-
+# -------------------
 # Unit Tests
+# -------------------
 unit_test:
   stage: test
-  needs:
-    - job: build
-      optional: true
+  needs: ["build_release"]
   script:
-    - echo "Start Unit Tests"
     - ./gradlew testDebugUnitTest --stacktrace --info
   artifacts:
     paths:
@@ -62,34 +58,32 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
+# -------------------
 # SonarQube Analysis
+# -------------------
 build-sonar:
   stage: build-sonar
   cache:
-    policy: pull-push
     key: "sonar-cache-$CI_COMMIT_REF_SLUG"
     paths:
       - "${SONAR_USER_HOME}/cache"
-  variables:
-    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   script:
-  - ./gradlew lintDebug
-  - ./gradlew sonarqube \
-      -Dsonar.login=$SONAR_TOKEN \
-      -Dsonar.host.url=$SONAR_HOST_URL \
-      -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
-      --stacktrace --info
-
+    - ./gradlew lintDebug
+    - ./gradlew sonarqube \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
+        --stacktrace --info
   allow_failure: true
   rules:
     - when: always
 
+# -------------------
 # Lint
+# -------------------
 lint_check:
   stage: lint
-  needs:
-    - job: build
-      optional: true
+  needs: ["build_release"]
   script:
     - ./gradlew lint
   artifacts:
@@ -97,12 +91,13 @@ lint_check:
       - app/build/reports/lint-results.html
     expire_in: 1 week
 
+# -------------------
 # Dependency Check (SAST)
+# -------------------
 sast_check:
   stage: dependency_check
   image: owasp/dependency-check:latest
   script:
-    - echo "Start Dependency Check"
     - dependency-check.sh --project MyApp --scan ./app --format "HTML" --out reports/dependency-check
   artifacts:
     paths:
@@ -110,8 +105,9 @@ sast_check:
     expire_in: 1 week
   allow_failure: true
 
-
-# Deploy Debug in Docker
+# -------------------
+# Deploy Debug Docker
+# -------------------
 docker_build:
   stage: deploy_debug
   image: gradle:8.10.0-jdk17-jammy
@@ -122,25 +118,25 @@ docker_build:
     - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
     - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
 
-
-
-
-
-
-# Deploy Release in Docker
+# -------------------
+# Deploy Release Docker
+# -------------------
 deploy_release:
   stage: deploy_release
-  image: gradle:8.10.0-jdk17-jammy
   script:
-    - echo "Deploy Release APK to Docker container"
-    - docker build -t myapp:release .
-    - docker run -d --name myapp_release myapp:release
+    - docker build -f Docker/Dockerfile -t myapp:release .
+    - docker stop myapp_release || true
+    - docker rm myapp_release || true
+    - docker run -d --name myapp_release -p 8080:8080 myapp:release
+  rules:
+    - when: always
 
+# -------------------
 # Final Report
+# -------------------
 report:
   stage: report
   script:
-    - echo "Pipeline finished. Collecting reports..."
     - ls -R app/build/reports || true
   rules:
     - when: always
