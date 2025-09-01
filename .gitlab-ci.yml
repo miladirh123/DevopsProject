@@ -47,8 +47,6 @@ build:
 
 
 
-# Deploy Debug in Docker
-# -------------------
 docker_deploy:
   stage: docker_deploy
   image: docker:24.0.5
@@ -58,17 +56,18 @@ docker_deploy:
     - job: build
       artifacts: true
   script:
-    # Crée un dossier pour l'APK
+    # Crée un dossier contenant l'APK
     - mkdir -p docker_app
-    # Copie l'APK unsigned généré
+    # Copie l'APK unsigned
     - cp app/build/outputs/apk/release/app-release-unsigned.apk docker_app/app-release.apk
-    # Build Docker en utilisant le dossier contenant l'APK
+    # Build l'image Docker avec le dossier contenant l'APK
     - docker build -t myapp:latest docker_app/
     # Stop et supprime le container si déjà existant
     - docker stop myapp || true
     - docker rm myapp || true
     # Lancer le container
     - docker run -d --name myapp -p 8080:8080 myapp:latest
+
 
 
 
