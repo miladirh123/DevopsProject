@@ -33,6 +33,7 @@ default:
 
 
 
+
 build:
   stage: build
   image: gradle:jdk17
@@ -40,11 +41,8 @@ build:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
   artifacts:
-    paths:       # ✅ Bien indenté
-      - app/build/outputs/apk/**/*.apk
-    expire_in: 1 week
-
-
+    paths:
+      - app/build/outputs/apk/release/app-release.apk
 
 
 # Unit Tests
@@ -73,13 +71,13 @@ build-sonar:
   variables:
     SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
   script:
-  - ./gradlew lintDebug
-  - ./gradlew sonarqube \
-      -Dsonar.login=$SONAR_TOKEN \
-      -Dsonar.host.url=$SONAR_HOST_URL \
-      -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
-      --stacktrace --info
-
+    - echo "Start SonarQube Analysis"
+    - ./gradlew lintDebug
+    - ./gradlew sonar \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
+        --stacktrace --info
   allow_failure: true
   rules:
     - when: always
@@ -121,7 +119,8 @@ docker_build:
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
     - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
     - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
-
+  rules:
+    - when: always
 
 
 
@@ -130,11 +129,12 @@ docker_build:
 # Deploy Release in Docker
 deploy_release:
   stage: deploy_release
-  image: gradle:8.10.0-jdk17-jammy
   script:
     - echo "Deploy Release APK to Docker container"
     - docker build -t myapp:release .
     - docker run -d --name myapp_release myapp:release
+  rules:
+    - when: always
 
 # Final Report
 report:
