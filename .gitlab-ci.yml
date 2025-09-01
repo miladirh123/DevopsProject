@@ -51,21 +51,25 @@ build:
 # -------------------
 docker_deploy:
   stage: docker_deploy
-  image: gradle:8.10.0-jdk17-jammy
+  image: docker:24.0.5
   services:
     - docker:dind
-  needs: [build]
-  before_script:
-    - apt-get update && apt-get install -y docker.io
-    - chmod +x ./gradlew
+  needs:
+    - job: build
+      artifacts: true
   script:
+    # Crée un dossier pour l'APK
     - mkdir -p docker_app
-    - cp app/build/outputs/apk/release/app-release.apk docker_app/
-    - echo -e "FROM openjdk:17-jdk\nCOPY app-release.apk /app-release.apk" > docker_app/Dockerfile
+    # Copie l'APK unsigned généré
+    - cp app/build/outputs/apk/release/app-release-unsigned.apk docker_app/app-release.apk
+    # Build Docker en utilisant le dossier contenant l'APK
     - docker build -t myapp:latest docker_app/
+    # Stop et supprime le container si déjà existant
     - docker stop myapp || true
     - docker rm myapp || true
+    # Lancer le container
     - docker run -d --name myapp -p 8080:8080 myapp:latest
+
 
 
 
