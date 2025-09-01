@@ -30,13 +30,11 @@ default:
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
 
-
-
+# Build APK
 build:
   stage: build
-  image: gradle:jdk17
   script:
-    - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
+    - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore || true
     - ./gradlew assembleRelease
   artifacts:
     paths:       
@@ -56,17 +54,18 @@ docker_deploy:
     - job: build
       artifacts: true
   script:
-    # Crée un dossier contenant l'APK
+    # Crée un dossier pour l'APK à copier dans Docker
     - mkdir -p docker_app
-    # Copie l'APK unsigned
+    # Copie l'APK déjà construit par le job build
     - cp app/build/outputs/apk/release/app-release-unsigned.apk docker_app/app-release.apk
-    # Build l'image Docker avec le dossier contenant l'APK
-    - docker build -t myapp:latest docker_app/
+    # Build l'image Docker en utilisant le Dockerfile dans Docker/
+    - docker build -t myapp:latest Docker/
     # Stop et supprime le container si déjà existant
     - docker stop myapp || true
     - docker rm myapp || true
     # Lancer le container
     - docker run -d --name myapp -p 8080:8080 myapp:latest
+
 
 
 
