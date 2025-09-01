@@ -49,21 +49,23 @@ build:
 
 # Deploy Debug in Docker
 # -------------------
-
 docker_deploy:
   stage: docker_deploy
-  image: docker:24.0.5
+  image: gradle:8.10.0-jdk17-jammy
   services:
     - docker:dind
-  needs:
-    - job: build
+  needs: [build]
+  before_script:
+    - apt-get update && apt-get install -y docker.io
+    - chmod +x ./gradlew
   script:
-    # Build Docker image en utilisant Dockerfile dans Docker/
-    - docker build -f Docker/Dockerfile -t myapp:latest .
-    # Stop container s'il existe
+    - mkdir -p docker_app
+    - cp app/build/outputs/apk/release/app-release.apk docker_app/
+    - echo -e "FROM openjdk:17-jdk\nCOPY app-release.apk /app-release.apk" > docker_app/Dockerfile
+    - docker build -t myapp:latest docker_app/
     - docker stop myapp || true
     - docker rm myapp || true
-    # Lancer container
     - docker run -d --name myapp -p 8080:8080 myapp:latest
+
 
 
