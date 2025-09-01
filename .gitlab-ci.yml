@@ -56,6 +56,9 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
+
+
+
 # Lint
 lint_check:
   stage: lint
@@ -87,6 +90,7 @@ build-sonar:
   allow_failure: true
   rules:
     - when: always
+    
 
 # Dependency Check (SAST)
 sast_check:
@@ -101,17 +105,14 @@ sast_check:
     expire_in: 1 week
   allow_failure: true
 
-# Local Deployment (déploiement sûr)
 local_deploy:
-  stage: deploy
+  stage: deploy  
   needs:
     - job: build
   script:
-    - echo "Déploiement local : récupération du dernier APK"
+    - echo "Déploiement local de l'APK"
     - mkdir -p deploy_apk
-    - rm -f deploy_apk/*.apk
-    - find app/build/outputs/apk/ -type f -name "*.apk" -exec cp {} deploy_apk/ \;
-    - echo "APK copiés dans deploy_apk :"
+    - cp app/build/outputs/apk/release/*.apk deploy_apk/
     - ls -l deploy_apk/
   artifacts:
     paths:
