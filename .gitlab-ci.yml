@@ -19,7 +19,7 @@ variables:
 default:
   image: gradle:8.10.0-jdk17-jammy
   before_script:
-    - apt-get update && apt-get install -y wget unzip curl docker.io
+    - apt-get update && apt-get install -y wget unzip curl
     - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
     - wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
     - unzip cmdtools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
@@ -32,12 +32,13 @@ default:
 
 build:
   stage: build
+  image: gradle:jdk17
   script:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
   artifacts:
     paths:
-      - app/build/outputs/apk/
+      - app/build/outputs/apk/release/
     expire_in: 1 week
 
 deploy_debug:
@@ -47,7 +48,7 @@ deploy_debug:
   script:
     - echo "Déploiement local : copie de l'APK"
     - mkdir -p ./local_apk
-    - cp app/build/outputs/apk/debug/app-debug.apk ./local_apk/
+    - cp app/build/outputs/apk/release/app-release.apk ./local_apk/
   artifacts:
     paths:
       - ./local_apk/
