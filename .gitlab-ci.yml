@@ -112,6 +112,9 @@ sast_check:
 
 
 # Deploy Debug in Docker
+# -------------------
+# Deploy Debug Docker
+# -------------------
 docker_build:
   stage: deploy_debug
   image: gradle:8.10.0-jdk17-jammy
@@ -122,25 +125,25 @@ docker_build:
     - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
     - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
 
-
-
-
-
-
-# Deploy Release in Docker
+# -------------------
+# Deploy Release Docker
+# -------------------
 deploy_release:
   stage: deploy_release
-  image: gradle:8.10.0-jdk17-jammy
   script:
-    - echo "Deploy Release APK to Docker container"
-    - docker build -t myapp:release .
-    - docker run -d --name myapp_release myapp:release
+    - docker build -f Docker/Dockerfile -t myapp:release .
+    - docker stop myapp_release || true
+    - docker rm myapp_release || true
+    - docker run -d --name myapp_release -p 8080:8080 myapp:release
+  rules:
+    - when: always
 
+# -------------------
 # Final Report
+# -------------------
 report:
   stage: report
   script:
-    - echo "Pipeline finished. Collecting reports..."
     - ls -R app/build/reports || true
   rules:
     - when: always
