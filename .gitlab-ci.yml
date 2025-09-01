@@ -42,7 +42,8 @@ build:
 
 deploy_debug:
   stage: deploy
-  needs: ["build"]   # doit correspondre au nom exact du job de build
+  needs:
+    - build
   script:
     - echo "Déploiement local : copie de l'APK"
     - mkdir -p ./local_apk
