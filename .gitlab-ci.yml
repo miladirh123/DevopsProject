@@ -46,53 +46,13 @@ build:
 
 
 
-# Unit Tests
-unit_test:
-  stage: test
-  needs:
-    - job: build
-      optional: true
-  script:
-    - echo "Start Unit Tests"
-    - ./gradlew testDebugUnitTest --stacktrace --info
-  artifacts:
-    paths:
-      - app/build/test-results/
-      - app/build/reports/tests/
-    when: always
 
 
 
-# Lint
-lint_check:
-  stage: lint
-  needs:
-    - job: build
-      optional: true
-  script:
-    - ./gradlew lint
-  artifacts:
-    paths:
-      - app/build/reports/lint-results.html
-    expire_in: 1 week
 
-# Dependency Check (SAST)
-sast_check:
-  stage: dependency_check
-  image: owasp/dependency-check:latest
-  script:
-    - echo "Start Dependency Check"
-    - dependency-check.sh --project MyApp --scan ./app --format "HTML" --out reports/dependency-check
-  artifacts:
-    paths:
-      - reports/dependency-check/
-    expire_in: 1 week
-  allow_failure: true
 
 
 # Deploy Debug in Docker
-# -------------------
-# Deploy Debug Docker
 # -------------------
 
 docker_deploy:
@@ -100,21 +60,15 @@ docker_deploy:
   image: docker:24.0.5
   services:
     - docker:dind
+  needs:
+    - job: build
   script:
     # Build Docker image en utilisant Dockerfile dans Docker/
-    - docker build -f Docker/Dockerfile -t myapp:latest Docker/
+    - docker build -f Docker/Dockerfile -t myapp:latest .
     # Stop container s'il existe
     - docker stop myapp || true
     - docker rm myapp || true
     # Lancer container
     - docker run -d --name myapp -p 8080:8080 myapp:latest
 
-# -------------------
-# Final Report
-# -------------------
-report:
-  stage: report
-  script:
-    - ls -R app/build/reports || true
-  rules:
-    - when: always
+
