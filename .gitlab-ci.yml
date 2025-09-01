@@ -41,11 +41,52 @@ build:
       - app/build/outputs/apk/**/*.apk
     expire_in: 1 week
 
+# Unit Tests
+unit_test:
+  stage: test
+  needs:
+    - job: build
+      optional: true
+  script:
+    - echo "Start Unit Tests"
+    - ./gradlew testDebugUnitTest --stacktrace --info
+  artifacts:
+    paths:
+      - app/build/test-results/
+      - app/build/reports/tests/
+    when: always
 
 
+
+# Lint
+lint_check:
+  stage: lint
+  needs:
+    - job: build
+      optional: true
+  script:
+    - ./gradlew lint
+  artifacts:
+    paths:
+      - app/build/reports/lint-results.html
+    expire_in: 1 week
+    
+
+# Dependency Check (SAST)
+sast_check:
+  stage: dependency_check
+  image: owasp/dependency-check:latest
+  script:
+    - echo "Start Dependency Check"
+    - dependency-check.sh --project MyApp --scan ./app --format "HTML" --out reports/dependency-check
+  artifacts:
+    paths:
+      - reports/dependency-check/
+    expire_in: 1 week
+  allow_failure: true
 
 local_deploy:
-  stage: deploy  # tu peux aussi créer un stage "deploy" si tu veux
+  stage: deploy  
   needs:
     - job: build
   script:
