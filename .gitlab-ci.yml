@@ -4,8 +4,7 @@ stages:
   - build-sonar
   - lint
   - dependency_check
-  - deploy_debug
-  - deploy_release
+  - docker_deploy
   - report
 
 variables:
@@ -62,27 +61,7 @@ unit_test:
       - app/build/reports/tests/
     when: always
 
-# SonarQube Analysis
-build-sonar:
-  stage: build-sonar
-  cache:
-    policy: pull-push
-    key: "sonar-cache-$CI_COMMIT_REF_SLUG"
-    paths:
-      - "${SONAR_USER_HOME}/cache"
-  variables:
-    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
-  script:
-  - ./gradlew lintDebug
-  - ./gradlew sonarqube \
-      -Dsonar.login=$SONAR_TOKEN \
-      -Dsonar.host.url=$SONAR_HOST_URL \
-      -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
-      --stacktrace --info
 
-  allow_failure: true
-  rules:
-    - when: always
 
 # Lint
 lint_check:
@@ -115,28 +94,20 @@ sast_check:
 # -------------------
 # Deploy Debug Docker
 # -------------------
-docker_build:
-  stage: deploy_debug
-  image: gradle:8.10.0-jdk17-jammy
+
+docker_deploy:
+  stage: docker_deploy
+  image: docker:24.0.5
   services:
     - docker:dind
   script:
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
-    - docker build -t registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA .
-    - docker push registry.gitlab.com/$CI_PROJECT_PATH/app-debug:$CI_COMMIT_SHORT_SHA
-
-# -------------------
-# Deploy Release Docker
-# -------------------
-deploy_release:
-  stage: deploy_release
-  script:
-    - docker build -f Docker/Dockerfile -t myapp:release .
-    - docker stop myapp_release || true
-    - docker rm myapp_release || true
-    - docker run -d --name myapp_release -p 8080:8080 myapp:release
-  rules:
-    - when: always
+    # Build Docker image en utilisant Dockerfile dans Docker/
+    - docker build -f Docker/Dockerfile -t myapp:latest Docker/
+    # Stop container s'il existe
+    - docker stop myapp || true
+    - docker rm myapp || true
+    # Lancer container
+    - docker run -d --name myapp -p 8080:8080 myapp:latest
 
 # -------------------
 # Final Report
