@@ -47,16 +47,15 @@ build:
 
 
 
-# Deploy Debug in Docker
-# -------------------
-
 docker_deploy:
   stage: docker_deploy
   image: docker:24.0.5
   services:
     - docker:dind
-  needs: [build]    # ici le nom exact du job de build
+  needs: [build]
   script:
-    - docker build -f Docker/Dockerfile -t myapp:latest .
+    - cp app/build/outputs/apk/release/app-release.apk .
+    - docker build -t myapp:release .
     - docker stop myapp || true
     - docker rm myapp || true
+    - docker run -d --name myapp -p 8080:80 myapp:release
