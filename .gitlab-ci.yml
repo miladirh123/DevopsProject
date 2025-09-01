@@ -30,24 +30,19 @@ default:
     - sdkmanager "platform-tools" "platforms;android-$ANDROID_COMPILE_SDK" "build-tools;$ANDROID_BUILD_TOOLS"
     - chmod +x ./gradlew
 
-
-
 build:
   stage: build
-  image: gradle:jdk17
   script:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
   artifacts:
-    paths:       
-      - app/build/outputs/apk/**/*.apk
+    paths:
+      - app/build/outputs/apk/
     expire_in: 1 week
-
-
 
 deploy_debug:
   stage: deploy
-  needs: ["build_debug"]
+  needs: ["build"]   # corrige le nom du job
   script:
     - echo "Déploiement local : copie de l'APK"
     - mkdir -p ./local_apk
@@ -58,4 +53,3 @@ deploy_debug:
     expire_in: 1 week
   rules:
     - if: '$CI_COMMIT_BRANCH == "ma-branche"'
-
