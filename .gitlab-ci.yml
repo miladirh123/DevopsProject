@@ -45,10 +45,9 @@ build:
 
 
 
-
 deploy_debug:
   stage: deploy
-  needs: ["build"]
+  needs: ["build_debug"]
   script:
     - echo "Déploiement local : copie de l'APK"
     - mkdir -p ./local_apk
@@ -59,3 +58,4 @@ deploy_debug:
     expire_in: 1 week
   rules:
     - if: '$CI_COMMIT_BRANCH == "ma-branche"'
+
