@@ -4,7 +4,7 @@ stages:
   - build-sonar
   - lint
   - dependency_check
-  - docker_deploy
+  - deploy
   - report
 
 variables:
@@ -46,16 +46,16 @@ build:
 
 
 
-
-docker_deploy:
-  stage: docker_deploy
-  image: docker:24.0.5
-  services:
-    - docker:dind
-  needs: [build]
+deploy_debug:
+  stage: deploy
+  needs: ["build"]
   script:
-    - cp app/build/outputs/apk/release/app-release.apk .
-    - docker build -t myapp:release .
-    - docker stop myapp || true
-    - docker rm myapp || true
-    - docker run -d --name myapp -p 8080:80 myapp:release
+    - echo "Déploiement local : copie de l'APK"
+    - mkdir -p ./local_apk
+    - cp app/build/outputs/apk/debug/app-debug.apk ./local_apk/
+  artifacts:
+    paths:
+      - ./local_apk/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "ma-branche"'
