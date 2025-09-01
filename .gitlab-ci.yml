@@ -38,7 +38,7 @@ build:
   stage: build
   image: gradle:jdk17
   script:
-    - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
+    - echo "$KEYSTORE_FILE" | base64 -d > keystore.jks
     - ./gradlew assembleRelease
   artifacts:
     paths:
