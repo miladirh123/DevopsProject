@@ -106,18 +106,23 @@ sast_check:
   allow_failure: true
 
 local_deploy:
-  stage: deploy  
+  stage: docker_deploy
   needs:
     - job: build
   script:
-    - echo "Déploiement local de l'APK"
+    - echo "Déploiement local : récupération du dernier APK"
     - mkdir -p deploy_apk
-    - cp app/build/outputs/apk/release/*.apk deploy_apk/
+    # Supprime les anciens APK pour ne pas confondre
+    - rm -f deploy_apk/*.apk
+    # Copie tous les APK fraîchement générés
+    - find app/build/outputs/apk/ -type f -name "*.apk" -exec cp {} deploy_apk/ \;
+    - echo "APK copiés dans deploy_apk :"
     - ls -l deploy_apk/
   artifacts:
     paths:
       - deploy_apk/
     expire_in: 1 week
+
 
 # Final Report
 report:
