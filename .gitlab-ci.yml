@@ -4,7 +4,7 @@ stages:
   - build-sonar
   - lint
   - dependency_check
-  - docker_deploy
+  - deploy
   - report
 
 variables:
@@ -44,30 +44,16 @@ build:
 
 
 
-
-docker_deploy:
-  stage: docker_deploy
-  image: docker:24.0.5
-  services:
-    - docker:dind
+local_deploy:
+  stage: deploy  # tu peux aussi créer un stage "deploy" si tu veux
   needs:
     - job: build
-      artifacts: true
   script:
-    # Crée un dossier pour l'APK à copier dans Docker
-    - mkdir -p docker_app
-    # Copie l'APK déjà construit par le job build
-    - cp app/build/outputs/apk/release/app-release-unsigned.apk docker_app/app-release.apk
-    # Build l'image Docker en utilisant le Dockerfile dans Docker/
-    - docker build -t myapp:latest Docker/
-    # Stop et supprime le container si déjà existant
-    - docker stop myapp || true
-    - docker rm myapp || true
-    # Lancer le container
-    - docker run -d --name myapp -p 8080:8080 myapp:latest
-
-
-
-
-
-
+    - echo "Déploiement local de l'APK"
+    - mkdir -p deploy_apk
+    - cp app/build/outputs/apk/release/*.apk deploy_apk/
+    - ls -l deploy_apk/
+  artifacts:
+    paths:
+      - deploy_apk/
+    expire_in: 1 week
