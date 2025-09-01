@@ -58,6 +58,7 @@ unit_test:
 
 
 
+
 # Lint
 lint_check:
   stage: lint
@@ -70,6 +71,25 @@ lint_check:
     paths:
       - app/build/reports/lint-results.html
     expire_in: 1 week
+
+# SonarQube Analysis
+build-sonar:
+  stage: build-sonar
+  cache:
+    policy: pull-push
+    key: "sonar-cache-$CI_COMMIT_REF_SLUG"
+    paths:
+      - "${SONAR_USER_HOME}/cache"
+  script:
+    - ./gradlew lintDebug
+    - ./gradlew sonar \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.androidLint.reportPaths=app/build/reports/lint-results-debug.xml \
+        --stacktrace --info
+  allow_failure: true
+  rules:
+    - when: always
     
 
 # Dependency Check (SAST)
@@ -98,3 +118,12 @@ local_deploy:
     paths:
       - deploy_apk/
     expire_in: 1 week
+
+# Final Report
+report:
+  stage: report
+  script:
+    - echo "Pipeline finished. Collecting reports..."
+    - ls -R app/build/reports || true
+  rules:
+    - when: always
