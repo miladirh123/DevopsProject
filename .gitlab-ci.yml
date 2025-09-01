@@ -33,7 +33,6 @@ default:
 
 
 
-
 build:
   stage: build
   image: gradle:jdk17
@@ -41,9 +40,10 @@ build:
     - echo $KEYSTORE_FILE | base64 -d > my-release-key.keystore
     - ./gradlew assembleRelease
   artifacts:
-  paths:
-    - app/build/outputs/apk/**/*.apk
-  expire_in: 1 week
+    paths:       
+      - app/build/outputs/apk/**/*.apk
+    expire_in: 1 week
+
 
 
 
