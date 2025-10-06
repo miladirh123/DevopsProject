@@ -1,5 +1,69 @@
-bat '''
-    set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
-    set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-    terraform show -no-color terraform/tfplan > terraform/tfplan.txt
-'''
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Appliquer automatiquement après le plan ?')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    dir("terraform") {
+                        git branch: 'main', url: 'https://github.com/miladirh123/DevopsProject.git'
+                    }
+                }
+            }
+        }
+
+        stage('Plan') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    bat '''
+                        echo Vérification des identifiants AWS...
+                        echo %AWS_ACCESS_KEY_ID%
+                        echo %AWS_SECRET_ACCESS_KEY%
+                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                        cd terraform && terraform init
+                        cd terraform && terraform plan -out tfplan
+                        cd terraform && terraform show -no-color tfplan > tfplan.txt
+                    '''
+                }
+            }
+        }
+
+        stage('Approval') {
+            when {
+                not {
+                    equals expected: true, actual: params.autoApprove
+                }
+            }
+            steps {
+                script {
+                    def plan = readFile 'terraform/tfplan.txt'
+                    input message: "Souhaitez-vous appliquer ce plan ?",
+                          parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
+                }
+            }
+        }
+
+        stage('Apply') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    bat '''
+                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                        cd terraform && terraform apply -input=false tfplan
+                    '''
+                }
+            }
+        }
+    }
+}
