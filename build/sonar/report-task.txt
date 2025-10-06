@@ -1,6 +1,0 @@
-projectKey=miladirahma6_devopsprojectf_c2e869a7-0e7a-40bc-845b-1b4c09a1f167
-serverUrl=http://host.docker.internal:9000
-serverVersion=25.8.0.112029
-dashboardUrl=http://host.docker.internal:9000/dashboard?id=miladirahma6_devopsprojectf_c2e869a7-0e7a-40bc-845b-1b4c09a1f167
-ceTaskId=f96cd253-bb34-4041-b321-b65c3192a2a6
-ceTaskUrl=http://host.docker.internal:9000/api/ce/task?id=f96cd253-bb34-4041-b321-b65c3192a2a6
