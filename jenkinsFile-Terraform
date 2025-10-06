@@ -28,9 +28,10 @@ pipeline {
                         echo %AWS_SECRET_ACCESS_KEY%
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-                        cd terraform && terraform init
-                        cd terraform && terraform plan -out tfplan
-                        cd terraform && terraform show -no-color tfplan > tfplan.txt
+                        cd terraform
+                        terraform init -upgrade
+                        terraform plan -out=tfplan
+                        terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
             }
@@ -60,7 +61,8 @@ pipeline {
                     bat '''
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-                        cd terraform && terraform apply -input=false tfplan
+                        cd terraform
+                        terraform apply -input=false tfplan
                     '''
                 }
             }
