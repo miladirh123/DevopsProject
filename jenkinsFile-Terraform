@@ -1,15 +1,9 @@
 pipeline {
+    agent any
 
     parameters {
-        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
-    } 
-
-    environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Appliquer automatiquement après le plan ?')
     }
-
-    agent any
 
     stages {
         stage('Checkout') {
@@ -24,10 +18,14 @@ pipeline {
 
         stage('Plan') {
             steps {
-                // Utiliser bat pour Windows
-                bat 'cd terraform && terraform init'
-                bat 'cd terraform && terraform plan -out tfplan'
-                bat 'cd terraform && terraform show -no-color tfplan > tfplan.txt'
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    bat 'cd terraform && terraform init'
+                    bat 'cd terraform && terraform plan -out tfplan'
+                    bat 'cd terraform && terraform show -no-color tfplan > tfplan.txt'
+                }
             }
         }
 
@@ -37,19 +35,23 @@ pipeline {
                     equals expected: true, actual: params.autoApprove
                 }
             }
-
             steps {
                 script {
                     def plan = readFile 'terraform/tfplan.txt'
-                    input message: "Do you want to apply the plan?",
-                          parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                    input message: "Souhaitez-vous appliquer ce plan ?",
+                          parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
                 }
             }
         }
 
         stage('Apply') {
             steps {
-                bat 'cd terraform && terraform apply -input=false tfplan'
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    bat 'cd terraform && terraform apply -input=false tfplan'
+                }
             }
         }
     }
