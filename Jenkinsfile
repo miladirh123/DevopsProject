@@ -19,25 +19,27 @@ pipeline {
             }
         }
 
-       /* stage('Run Tests') {
+        /*stage('Run Tests') {
             steps {
                 bat 'npm test'
             }
         }*/
 
         stage('SonarQube Analysis') {
-    steps {
-        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-            bat """
-            sonar-scanner.bat ^
-            -D"sonar.projectKey=node_app" ^
-            -D"sonar.sources=." ^
-            -D"sonar.host.url=http://host.docker.internal:9000" ^
-            -D"sonar.login=%SONAR_TOKEN%"
-            """
+            steps {
+                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                    bat """
+                    sonar-scanner.bat ^
+                    -D"sonar.projectKey=%SONAR_PROJECT_KEY%" ^
+                    -D"sonar.sources=." ^
+                    -D"sonar.host.url=http://host.docker.internal:9000" ^
+                    -D"sonar.login=%SONAR_TOKEN%"
+                    """
+                }
+            }
         }
-    }
-}
+
+    } // <-- fin des stages
 
     post {
         success {
@@ -47,4 +49,5 @@ pipeline {
             echo 'Build failed. Check logs.'
         }
     }
+
 }
