@@ -6,7 +6,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout Github') {
             steps {
                 git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
@@ -19,32 +18,39 @@ pipeline {
             }
         }
 
-       /* stage('Run Tests') {
+        // Optionnel : Active si tu veux exécuter les tests
+        /*
+        stage('Run Tests') {
             steps {
                 bat 'npm test'
             }
-        }*/
+        }
+        */
 
         stage('SonarQube Analysis') {
-    steps {
-        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-            bat """
-            sonar-scanner.bat ^
-            -D"sonar.projectKey=node_app" ^
-            -D"sonar.sources=." ^
-            -D"sonar.host.url=http://host.docker.internal:9000" ^
-            -D"sonar.login=%SONAR_TOKEN%"
-            """
+            steps {
+                withCredentials([
+                    string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')
+                ]) {
+                    bat '''
+                        set SONAR_TOKEN=%SONAR_TOKEN%
+                        sonar-scanner.bat ^
+                            -D"sonar.projectKey=%SONAR_PROJECT_KEY%" ^
+                            -D"sonar.sources=." ^
+                            -D"sonar.host.url=http://host.docker.internal:9000" ^
+                            -D"sonar.login=%SONAR_TOKEN%"
+                    '''
+                }
+            }
         }
     }
-}
 
     post {
         success {
-            echo 'Build completed successfully!'
+            echo '✅ Build completed successfully!'
         }
         failure {
-            echo 'Build failed. Check logs.'
+            echo '❌ Build failed. Check logs for details.'
         }
     }
 }
