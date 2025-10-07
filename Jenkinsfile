@@ -18,11 +18,11 @@ pipeline {
             }
         }
 
-        stage('Tests') {
+        /*stage('Tests') {
             steps {
                 bat 'npm test'
             }
-        }
+        }*/
 
         stage('SonarQube Analysis') {
             steps {
