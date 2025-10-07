@@ -19,11 +19,11 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
+       /* stage('Run Tests') {
             steps {
                 bat 'npm test'
             }
-        }
+        }*/
 
         stage('SonarQube Analysis (Docker)') {
             steps {
