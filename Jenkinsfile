@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         SONAR_PROJECT_KEY = 'node_app'
+        SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat' // Chemin absolu vers le scanner
     }
 
     stages {
@@ -32,14 +33,14 @@ pipeline {
                 withCredentials([
                     string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')
                 ]) {
-                    bat '''
+                    bat """
                         set SONAR_TOKEN=%SONAR_TOKEN%
-                        sonar-scanner.bat ^
+                        "%SONAR_SCANNER_PATH%" ^
                             -D"sonar.projectKey=%SONAR_PROJECT_KEY%" ^
                             -D"sonar.sources=." ^
                             -D"sonar.host.url=http://host.docker.internal:9000" ^
                             -D"sonar.login=%SONAR_TOKEN%"
-                    '''
+                    """
                 }
             }
         }
