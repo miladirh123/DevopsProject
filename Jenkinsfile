@@ -3,8 +3,6 @@ pipeline {
 
     environment {
         SONAR_PROJECT_KEY = 'node_app'
-        WORKSPACE_DIR = "${env.WORKSPACE}" // répertoire du projet Jenkins
-        SONAR_TOKEN = credentials('SONAR_TOKEN') // token SonarQube stocké dans Jenkins Credentials
     }
 
     stages {
@@ -15,29 +13,31 @@ pipeline {
             }
         }
 
-        /*stage('Install node dependencies') {
+        stage('Install node dependencies') {
             steps {
                 bat 'npm install'
             }
-        }*/
-        stage('Run Tests') {
+        }
+
+       /* stage('Run Tests') {
             steps {
                 bat 'npm test'
             }
-        }
+        }*/
 
         stage('SonarQube Analysis') {
-            steps {
-                bat """
-                docker run --rm ^
-                -e SONAR_HOST_URL=http://host.docker.internal:9000 ^
-                -e SONAR_LOGIN=%SONAR_TOKEN% ^
-                -v "%WORKSPACE_DIR%:/usr/src" ^
-                sonarsource/sonar-scanner-cli
-                """
-            }
+    steps {
+        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+            bat """
+            sonar-scanner.bat ^
+            -D"sonar.projectKey=node_app" ^
+            -D"sonar.sources=." ^
+            -D"sonar.host.url=http://host.docker.internal:9000" ^
+            -D"sonar.login=%SONAR_TOKEN%"
+            """
         }
     }
+}
 
     post {
         success {
