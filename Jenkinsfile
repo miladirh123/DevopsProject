@@ -25,21 +25,19 @@ pipeline {
             }
         }*/
 
-        stage('SonarQube Analysis (Docker)') {
-            steps {
-                withCredentials([string(credentialsId: 'node-token', variable: 'SONAR_TOKEN')]) {
-                    // Exécuter SonarScanner via Docker
-                    bat """
-                    docker run --rm ^
-                        -e SONAR_HOST_URL=http://host.docker.internal:9000 ^
-                        -e SONAR_LOGIN=%SONAR_TOKEN% ^
-                        -v "%CD%:/usr/src" ^
-                        sonarsource/sonar-scanner-cli
-                    """
-                }
-            }
+        stage('SonarQube Analysis') {
+    steps {
+        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+            bat """
+            sonar-scanner.bat ^
+            -D"sonar.projectKey=node_app" ^
+            -D"sonar.sources=." ^
+            -D"sonar.host.url=http://host.docker.internal:9000" ^
+            -D"sonar.login=%SONAR_TOKEN%"
+            """
         }
     }
+}
 
     post {
         success {
