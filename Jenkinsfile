@@ -25,7 +25,7 @@ pipeline {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    file(credentialsId: 'ec2-key-pem', variable: 'KEY_FILE')
+                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
@@ -63,7 +63,7 @@ pipeline {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    file(credentialsId: 'ec2-key-pem', variable: 'KEY_FILE')
+                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
