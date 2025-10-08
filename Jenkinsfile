@@ -28,11 +28,16 @@ pipeline {
                     sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
+                        setlocal EnableDelayedExpansion
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
 
                         set PRIVATE_KEY_CONTENTS=
-                        for /f "delims=" %%i in (%KEY_FILE%) do set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!%%i\\n
+                        for /f "delims=" %%i in (%KEY_FILE%) do (
+                            set line=%%i
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n
+                        )
+                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
 
                         cd terraform
                         terraform init -upgrade || exit /b 1
@@ -66,11 +71,16 @@ pipeline {
                     sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
+                        setlocal EnableDelayedExpansion
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
 
                         set PRIVATE_KEY_CONTENTS=
-                        for /f "delims=" %%i in (%KEY_FILE%) do set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!%%i\\n
+                        for /f "delims=" %%i in (%KEY_FILE%) do (
+                            set line=%%i
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n
+                        )
+                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
 
                         cd terraform
                         terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -var="private_key=%PRIVATE_KEY_CONTENTS%" -input=false tfplan || exit /b 1
