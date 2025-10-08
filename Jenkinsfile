@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         SONAR_PROJECT_KEY = 'node_app'
-        SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat' // Chemin absolu vers le scanner
+        SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
     }
 
     stages {
@@ -19,15 +19,6 @@ pipeline {
             }
         }
 
-        // Optionnel : Active si tu veux exécuter les tests
-        /*
-        stage('Run Tests') {
-            steps {
-                bat 'npm test'
-            }
-        }
-        */
-
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([
@@ -38,7 +29,7 @@ pipeline {
                         "%SONAR_SCANNER_PATH%" ^
                             -D"sonar.projectKey=%SONAR_PROJECT_KEY%" ^
                             -D"sonar.sources=." ^
-                            -D"sonar.host.url=http://host.docker.internal:9000" ^
+                            -D"sonar.host.url=http://localhost:9000" ^
                             -D"sonar.login=%SONAR_TOKEN%"
                     """
                 }
