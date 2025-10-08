@@ -20,8 +20,8 @@ pipeline {
             }
         }
 
-        // 🌍 2. Provisionnement EC2 avec Terraform
-        stage('Terraform Plan & Apply') {
+        // 🌍 2. Terraform Plan
+        stage('Terraform Plan') {
             steps {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
@@ -32,14 +32,15 @@ pipeline {
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
                         cd terraform
-                        terraform init -upgrade
-                        terraform plan -out=tfplan
+                        terraform init -upgrade || exit /b 1
+                        terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -out=tfplan || exit /b 1
                         terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
             }
         }
 
+        // ✅ 3. Validation manuelle du plan
         stage('Terraform Approval') {
             when {
                 not {
@@ -55,6 +56,7 @@ pipeline {
             }
         }
 
+        // 🚀 4. Terraform Apply
         stage('Terraform Apply') {
             steps {
                 withCredentials([
@@ -65,27 +67,29 @@ pipeline {
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
                         cd terraform
-                        terraform apply -input=false tfplan
+                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -input=false tfplan
                     '''
                 }
             }
         }
 
-        // 📦 3. Installation des dépendances Node.js
+        // 📦 5. Installation des dépendances Node.js
         stage('Install Node Dependencies') {
             steps {
                 bat 'npm install'
             }
         }
 
-        // 🧪 4. Tests unitaires
-        /*stage('Run Tests') {
+        // 🧪 6. Tests unitaires (optionnel)
+        /*
+        stage('Run Tests') {
             steps {
                 bat 'npm test'
             }
-        }*/
+        }
+        */
 
-        // 📊 5. Analyse SonarQube
+        // 📊 7. Analyse SonarQube
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([
@@ -103,7 +107,7 @@ pipeline {
             }
         }
 
-        // 🚀 6. Déploiement sur EC2
+        // 🚀 8. Déploiement sur EC2
         stage('Deploy to EC2') {
             steps {
                 withCredentials([
@@ -117,7 +121,7 @@ pipeline {
             }
         }
 
-        // 📣 7. Notification
+        // 📣 9. Notification
         stage('Notify') {
             steps {
                 echo '📢 Pipeline terminé. Application déployée sur EC2.'
