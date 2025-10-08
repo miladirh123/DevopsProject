@@ -5,7 +5,7 @@ provider "aws" {
 }
 
 resource "aws_instance" "devapp" {
-  ami           = "ami-0c55b159cbfafe1f0"
+  ami           = "ami-052064a798f08f0d3"
   instance_type = "t2.micro"
   key_name      = "ec2-key"
 
