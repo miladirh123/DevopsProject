@@ -1,13 +1,13 @@
 provider "aws" {
-  region     = "us-east-1" # ✅ Région compatible avec Free Tier et t2.micro
+  region     = "us-east-1"
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
 resource "aws_instance" "devapp" {
-  ami           = "ami-0c02fb55956c7d316" # ✅ Amazon Linux 2 AMI compatible Free Tier dans us-east-1
-  instance_type = "t2.micro"              # ✅ Type gratuit dans Free Tier
-  key_name      = "ec2-key"               # ✅ Paire de clés que tu as créée
+  ami           = "ami-052064a798f08f0d3" # ← ton AMI Amazon Linux 2023
+  instance_type = "t3.micro"              # ← ton type d’instance
+  key_name      = "ec2-key"               # ← ta paire de clés SSH
 
   tags = {
     Name = "DevAppInstance"
@@ -15,8 +15,8 @@ resource "aws_instance" "devapp" {
 
   provisioner "remote-exec" {
     inline = [
-      "sudo yum update -y",
-      "sudo yum install docker -y",
+      "sudo dnf update -y",
+      "sudo dnf install docker -y",
       "sudo systemctl start docker",
       "sudo systemctl enable docker"
     ]
