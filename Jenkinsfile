@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    options {
-        ansiColor('xterm')
-    }
-
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Appliquer automatiquement après le plan Terraform ?')
     }
@@ -13,33 +9,30 @@ pipeline {
         SONAR_PROJECT_KEY = 'node_app'
         SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
         NODE_ENV = 'production'
-        DOCKER_IMAGE = 'miladirh123/appnode'
     }
 
     stages {
 
+        // 📥 1. Checkout du code
         stage('Checkout Code') {
             steps {
-                echo '📥 Étape 1 : Récupération du code source...'
                 git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
             }
         }
 
+        // 🌍 2. Terraform Plan
         stage('Terraform Plan') {
             steps {
-                echo '🌍 Étape 2 : Génération du plan Terraform...'
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     bat '''
-                        @echo off
+                        echo Vérification des identifiants AWS...
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
                         cd terraform
-                        echo Initialisation Terraform...
                         terraform init -upgrade || exit /b 1
-                        echo Génération du plan...
                         terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -out=tfplan || exit /b 1
                         terraform show -no-color tfplan > tfplan.txt
                     '''
@@ -47,6 +40,7 @@ pipeline {
             }
         }
 
+        // ✅ 3. Validation manuelle du plan
         stage('Terraform Approval') {
             when {
                 not {
@@ -54,7 +48,6 @@ pipeline {
                 }
             }
             steps {
-                echo '✅ Étape 3 : Validation manuelle du plan Terraform...'
                 script {
                     def plan = readFile 'terraform/tfplan.txt'
                     input message: "Souhaitez-vous appliquer ce plan Terraform ?",
@@ -63,55 +56,47 @@ pipeline {
             }
         }
 
+        // 🚀 4. Terraform Apply
         stage('Terraform Apply') {
             steps {
-                echo '🚀 Étape 4 : Application du plan Terraform...'
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     bat '''
-                        @echo off
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
                         cd terraform
-                        echo Application du plan...
-                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -input=false tfplan || exit /b 1
-                        terraform output -raw ec2_public_ip > ec2_ip.txt
+                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -input=false tfplan
                     '''
                 }
             }
         }
 
-        stage('Build & Push Docker Image') {
+        // 📦 5. Installation des dépendances Node.js
+        stage('Install Node Dependencies') {
             steps {
-                echo '🐳 Étape 5 : Construction et push de l’image Docker...'
-                withCredentials([
-                    usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
-                ]) {
-                    bat '''
-                        @echo off
-                        echo Construction de l’image...
-                        docker build -t %DOCKER_IMAGE% .
-                        echo Connexion à Docker Hub...
-                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                        echo Push de l’image...
-                        docker push %DOCKER_IMAGE%
-                    '''
-                }
+                bat 'npm install'
             }
         }
 
+        // 🧪 6. Tests unitaires (optionnel)
+        /*
+        stage('Run Tests') {
+            steps {
+                bat 'npm test'
+            }
+        }
+        */
+
+        // 📊 7. Analyse SonarQube
         stage('SonarQube Analysis') {
             steps {
-                echo '📊 Étape 6 : Analyse SonarQube...'
                 withCredentials([
                     string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')
                 ]) {
                     bat """
-                        @echo off
                         set SONAR_TOKEN=%SONAR_TOKEN%
-                        echo Lancement de l’analyse SonarQube...
                         "%SONAR_SCANNER_PATH%" ^
                             -D"sonar.projectKey=%SONAR_PROJECT_KEY%" ^
                             -D"sonar.sources=." ^
@@ -122,28 +107,24 @@ pipeline {
             }
         }
 
+        // 🚀 8. Déploiement sur EC2
         stage('Deploy to EC2') {
             steps {
-                echo '🚀 Étape 7 : Déploiement sur EC2 via Docker Hub...'
                 withCredentials([
                     sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY', usernameVariable: 'USER')
                 ]) {
-                    script {
-                        def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
-                        bat """
-                            @echo off
-                            echo Connexion à EC2 et déploiement...
-                            ssh -i %KEY% %USER%@${ec2_ip} ^
-                                "docker pull %DOCKER_IMAGE% && docker stop appnode || true && docker rm appnode || true && docker run -d --name appnode -p 80:3000 %DOCKER_IMAGE%"
-                        """
-                    }
+                    bat '''
+                        echo Déploiement sur EC2...
+                        ssh -i %KEY% %USER%@<EC2_PUBLIC_IP> "cd /var/www/app && git pull && npm install && npm run start"
+                    '''
                 }
             }
         }
 
+        // 📣 9. Notification
         stage('Notify') {
             steps {
-                echo '📣 Étape 8 : Notification de fin de pipeline.'
+                echo '📢 Pipeline terminé. Application déployée sur EC2.'
             }
         }
     }
