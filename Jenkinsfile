@@ -9,7 +9,7 @@ pipeline {
         SONAR_PROJECT_KEY = 'node_app'
         SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
         NODE_ENV = 'production'
-        DOCKER_IMAGE = 'tonutilisateur/appnode' // Remplace par ton nom Docker Hub
+        DOCKER_IMAGE = 'miladirh123/appnode' // Remplace par ton nom Docker Hub
     }
 
     stages {
