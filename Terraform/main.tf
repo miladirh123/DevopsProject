@@ -1,8 +1,3 @@
-variable "private_key" {
-  type        = string
-  description = "Clé privée SSH pour se connecter à EC2"
-}
-
 resource "aws_instance" "devapp" {
   ami           = "ami-0c55b159cbfafe1f0"
   instance_type = "t2.micro"
@@ -27,8 +22,4 @@ resource "aws_instance" "devapp" {
       host        = self.public_ip
     }
   }
-}
-
-output "ec2_public_ip" {
-  value = aws_instance.devapp.public_ip
 }
