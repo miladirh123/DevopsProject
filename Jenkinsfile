@@ -9,6 +9,7 @@ pipeline {
         SONAR_PROJECT_KEY = 'node_app'
         SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
         NODE_ENV = 'production'
+        DOCKER_IMAGE = 'tonutilisateur/appnode' // Remplace par ton nom Docker Hub
     }
 
     stages {
@@ -56,7 +57,7 @@ pipeline {
             }
         }
 
-        // 🚀 4. Terraform Apply
+        // 🚀 4. Terraform Apply + capture IP EC2
         stage('Terraform Apply') {
             steps {
                 withCredentials([
@@ -68,28 +69,33 @@ pipeline {
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
                         cd terraform
                         terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -input=false tfplan
+                        terraform output -raw ec2_public_ip > ec2_ip.txt
                     '''
                 }
             }
         }
 
-        // 📦 5. Installation des dépendances Node.js
-        stage('Install Node Dependencies') {
+        // 🐳 5. Build & Push Docker Image
+        stage('Build & Push Docker Image') {
             steps {
-                bat 'npm install'
+                withCredentials([
+                    usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                ]) {
+                    bat '''
+                        echo Construction de l'image Docker...
+                        docker build -t %DOCKER_IMAGE% .
+
+                        echo Connexion à Docker Hub...
+                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+
+                        echo Push de l'image...
+                        docker push %DOCKER_IMAGE%
+                    '''
+                }
             }
         }
 
-        // 🧪 6. Tests unitaires (optionnel)
-        /*
-        stage('Run Tests') {
-            steps {
-                bat 'npm test'
-            }
-        }
-        */
-
-        // 📊 7. Analyse SonarQube
+        // 📊 6. Analyse SonarQube
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([
@@ -107,21 +113,25 @@ pipeline {
             }
         }
 
-        // 🚀 8. Déploiement sur EC2
+        // 🚀 7. Déploiement sur EC2 via Docker
         stage('Deploy to EC2') {
             steps {
                 withCredentials([
                     sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY', usernameVariable: 'USER')
                 ]) {
-                    bat '''
-                        echo Déploiement sur EC2...
-                        ssh -i %KEY% %USER%@<EC2_PUBLIC_IP> "cd /var/www/app && git pull && npm install && npm run start"
-                    '''
+                    script {
+                        def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
+                        bat """
+                            echo Déploiement sur EC2...
+                            ssh -i %KEY% %USER%@${ec2_ip} ^
+                                "docker pull %DOCKER_IMAGE% && docker stop appnode || true && docker rm appnode || true && docker run -d --name appnode -p 80:3000 %DOCKER_IMAGE%"
+                        """
+                    }
                 }
             }
         }
 
-        // 📣 9. Notification
+        // 📣 8. Notification
         stage('Notify') {
             steps {
                 echo '📢 Pipeline terminé. Application déployée sur EC2.'
