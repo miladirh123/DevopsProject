@@ -9,7 +9,7 @@ pipeline {
         SONAR_PROJECT_KEY = 'node_app'
         SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
         NODE_ENV = 'production'
-        DOCKER_IMAGE = 'miladirh123/appnode'
+        DOCKER_IMAGE = 'rahmam123/devapp'
     }
 
     stages {
@@ -110,7 +110,7 @@ pipeline {
                         def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
                         bat """
                             ssh -i %KEY% %USER%@${ec2_ip} ^
-                                "docker pull %DOCKER_IMAGE% && docker stop appnode || true && docker rm appnode || true && docker run -d --name appnode -p 80:3000 %DOCKER_IMAGE%"
+                                "docker pull %DOCKER_IMAGE% && docker stop devapp || true && docker rm devapp || true && docker run -d --name devapp -p 80:3000 %DOCKER_IMAGE%"
                         """
                     }
                 }
