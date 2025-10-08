@@ -33,7 +33,7 @@ pipeline {
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
 
                         set PRIVATE_KEY_CONTENTS=
-                        for /f "delims=" %%i in (%KEY_FILE%) do (
+                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
                             set line=%%i
                             set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n
                         )
@@ -76,7 +76,7 @@ pipeline {
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
 
                         set PRIVATE_KEY_CONTENTS=
-                        for /f "delims=" %%i in (%KEY_FILE%) do (
+                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
                             set line=%%i
                             set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n
                         )
@@ -90,19 +90,7 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker Image') {
-            steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
-                ]) {
-                    bat '''
-                        docker build -t %DOCKER_IMAGE% .
-                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                        docker push %DOCKER_IMAGE%
-                    '''
-                }
-            }
-        }
+   
 
         stage('SonarQube Analysis') {
             steps {
