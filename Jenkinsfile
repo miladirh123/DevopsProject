@@ -9,7 +9,7 @@ pipeline {
         SONAR_PROJECT_KEY = 'node_app'
         SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
         NODE_ENV = 'production'
-        DOCKER_IMAGE = 'miladirh123/appnode' // Remplace par ton nom Docker Hub
+        DOCKER_IMAGE = 'miladirh123/appnode' // ton image Docker Hub
     }
 
     stages {
@@ -29,7 +29,6 @@ pipeline {
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     bat '''
-                        echo Vérification des identifiants AWS...
                         set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
                         set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
                         cd terraform
@@ -82,13 +81,8 @@ pipeline {
                     usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
                 ]) {
                     bat '''
-                        echo Construction de l'image Docker...
                         docker build -t %DOCKER_IMAGE% .
-
-                        echo Connexion à Docker Hub...
                         echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-
-                        echo Push de l'image...
                         docker push %DOCKER_IMAGE%
                     '''
                 }
@@ -113,7 +107,7 @@ pipeline {
             }
         }
 
-        // 🚀 7. Déploiement sur EC2 via Docker
+        // 🚀 7. Déploiement sur EC2 via Docker Hub
         stage('Deploy to EC2') {
             steps {
                 withCredentials([
@@ -122,7 +116,6 @@ pipeline {
                     script {
                         def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
                         bat """
-                            echo Déploiement sur EC2...
                             ssh -i %KEY% %USER%@${ec2_ip} ^
                                 "docker pull %DOCKER_IMAGE% && docker stop appnode || true && docker rm appnode || true && docker run -d --name appnode -p 80:3000 %DOCKER_IMAGE%"
                         """
