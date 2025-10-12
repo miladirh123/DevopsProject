@@ -1,7 +1,6 @@
 pipeline {
     agent { label 'windows' }
 
-
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Appliquer automatiquement après le plan Terraform ?')
     }
@@ -29,11 +28,15 @@ pipeline {
                     file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
                     bat '''
+                        set LF=^
+
+                        rem (ligne vide ci-dessous pour créer un saut de ligne)
+                        
                         setlocal EnableDelayedExpansion
                         set PRIVATE_KEY_CONTENTS=
                         for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
                             set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!!LF!
                         )
                         endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
 
@@ -70,11 +73,15 @@ pipeline {
                     file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
                     bat '''
+                        set LF=^
+
+                        rem (ligne vide ci-dessous pour créer un saut de ligne)
+                        
                         setlocal EnableDelayedExpansion
                         set PRIVATE_KEY_CONTENTS=
                         for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
                             set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!!LF!
                         )
                         endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
 
