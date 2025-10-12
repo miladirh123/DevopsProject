@@ -35,7 +35,7 @@ pipeline {
                         set PRIVATE_KEY_CONTENTS=
                         for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
                             set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
                         )
                         endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
 
@@ -72,13 +72,10 @@ pipeline {
                 ]) {
                     bat '''
                         setlocal EnableDelayedExpansion
-                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
-                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-
                         set PRIVATE_KEY_CONTENTS=
                         for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
                             set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
                         )
                         endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
 
