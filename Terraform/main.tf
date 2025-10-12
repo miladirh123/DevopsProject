@@ -29,7 +29,7 @@ resource "aws_security_group" "ssh_access" {
 }
 
 resource "aws_instance" "devapp" {
-  ami           = "ami-04c08fd8aa14af291"
+  ami           = "ami-04c08fd8aa14af291" # Amazon Linux 2023
   instance_type = "t3.micro"
   key_name      = "ec2-key"
   security_groups = [aws_security_group.ssh_access.name]
@@ -59,4 +59,6 @@ resource "aws_instance" "devapp" {
       timeout     = "5m"
     }
   }
+
+  depends_on = [aws_security_group.ssh_access]
 }

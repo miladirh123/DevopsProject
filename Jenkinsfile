@@ -13,7 +13,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
                 git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
@@ -35,9 +34,7 @@ pipeline {
                         terraform init -upgrade
                         terraform plan -var="aws_access_key=$env:AWS_ACCESS_KEY_ID" `
                                        -var="aws_secret_key=$env:AWS_SECRET_ACCESS_KEY" `
-                                       -var="private_key=$env:PRIVATE_KEY_CONTENTS" `
-                                       -out=tfplan
-                        terraform show -no-color tfplan > tfplan.txt
+                                       -var="private_key=$env:PRIVATE_KEY_CONTENTS"
                     '''
                 }
             }
@@ -68,11 +65,12 @@ pipeline {
                         $env:PRIVATE_KEY_CONTENTS = $privateKey
 
                         cd terraform
-                        terraform apply -var="aws_access_key=$env:AWS_ACCESS_KEY_ID" `
-                                        -var="aws_secret_key=$env:AWS_SECRET_ACCESS_KEY" `
-                                        -var="private_key=$env:PRIVATE_KEY_CONTENTS" `
-                                        -input=false tfplan
-                        terraform output -raw ec2_public_ip > ec2_ip.txt
+                        terraform apply -auto-approve -var="aws_access_key=$env:AWS_ACCESS_KEY_ID" `
+                                                        -var="aws_secret_key=$env:AWS_SECRET_ACCESS_KEY" `
+                                                        -var="private_key=$env:PRIVATE_KEY_CONTENTS"
+
+                        $ip = terraform output -raw ec2_public_ip
+                        Set-Content -Path ec2_ip.txt -Value $ip -Encoding ASCII
                     '''
                 }
             }
