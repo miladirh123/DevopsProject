@@ -27,25 +27,16 @@ pipeline {
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                     file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
-                    bat '''
-                        set LF=^
-
-                        rem (ligne vide ici pour créer un saut de ligne)
-
-                        setlocal EnableDelayedExpansion
-                        set PRIVATE_KEY_CONTENTS=
-                        for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
-                            set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!!LF!
-                        )
-                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
+                    powershell '''
+                        $privateKey = Get-Content "$env:EC2_KEY_PATH" -Raw
+                        $env:PRIVATE_KEY_CONTENTS = $privateKey
 
                         cd terraform
-                        terraform init -upgrade || exit /b 1
-                        terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                                       -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                       -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
-                                       -out=tfplan || exit /b 1
+                        terraform init -upgrade
+                        terraform plan -var="aws_access_key=$env:AWS_ACCESS_KEY_ID" `
+                                       -var="aws_secret_key=$env:AWS_SECRET_ACCESS_KEY" `
+                                       -var="private_key=$env:PRIVATE_KEY_CONTENTS" `
+                                       -out=tfplan
                         terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
@@ -72,24 +63,15 @@ pipeline {
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                     file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
-                    bat '''
-                        set LF=^
-
-                        rem (ligne vide ici pour créer un saut de ligne)
-
-                        setlocal EnableDelayedExpansion
-                        set PRIVATE_KEY_CONTENTS=
-                        for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
-                            set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!!LF!
-                        )
-                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
+                    powershell '''
+                        $privateKey = Get-Content "$env:EC2_KEY_PATH" -Raw
+                        $env:PRIVATE_KEY_CONTENTS = $privateKey
 
                         cd terraform
-                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                        -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
-                                        -input=false tfplan || exit /b 1
+                        terraform apply -var="aws_access_key=$env:AWS_ACCESS_KEY_ID" `
+                                        -var="aws_secret_key=$env:AWS_SECRET_ACCESS_KEY" `
+                                        -var="private_key=$env:PRIVATE_KEY_CONTENTS" `
+                                        -input=false tfplan
                         terraform output -raw ec2_public_ip > ec2_ip.txt
                     '''
                 }
