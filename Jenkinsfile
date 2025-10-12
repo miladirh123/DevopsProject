@@ -19,20 +19,23 @@ pipeline {
                 git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
             }
         }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                    bat """
-                        %SONAR_SCANNER_PATH% ^
-                        -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
-                        -Dsonar.sources=. ^
-                        -Dsonar.host.url=http://localhost:9000 ^
-                        -Dsonar.login=%SONAR_TOKEN%
-                    """
-                }
-            }
+stage('SonarQube Analysis') {
+    options {
+        timeout(time: 3, unit: 'MINUTES')
+    }
+    steps {
+        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+            bat """
+                %SONAR_SCANNER_PATH% ^
+                -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
+                -Dsonar.sources=. ^
+                -Dsonar.host.url=http://localhost:9000 ^
+                -Dsonar.login=%SONAR_TOKEN%
+            """
         }
+    }
+}
+
 
         stage('Terraform Plan') {
             steps {
