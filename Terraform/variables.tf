@@ -1,14 +1,11 @@
 variable "aws_access_key" {
-  type        = string
-  description = "Clé d'accès AWS"
+  type = string
 }
 
 variable "aws_secret_key" {
-  type        = string
-  description = "Clé secrète AWS"
+  type = string
 }
 
 variable "private_key" {
-  type        = string
-  description = "Clé privée SSH pour provisioner EC2"
+  type = string
 }

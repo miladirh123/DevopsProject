@@ -5,9 +5,9 @@ provider "aws" {
 }
 
 resource "aws_instance" "devapp" {
-  ami           = "ami-052064a798f08f0d3" # ← ton AMI Amazon Linux 2023
-  instance_type = "t3.micro"              # ← ton type d’instance
-  key_name      = "ec2-key"               # ← ta paire de clés SSH
+  ami           = "ami-052064a798f08f0d3"
+  instance_type = "t3.micro"
+  key_name      = "ec2-key"
 
   tags = {
     Name = "DevAppInstance"
