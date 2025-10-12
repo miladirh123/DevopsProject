@@ -4,12 +4,15 @@ provider "aws" {
   secret_key = var.aws_secret_key
 }
 
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
 resource "aws_security_group" "ssh_access" {
-  name        = "ssh-access"
+  name        = "ssh-access-${random_id.suffix.hex}"
   description = "Allow SSH inbound traffic"
 
   ingress {
-    description = "SSH from anywhere"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -29,7 +32,7 @@ resource "aws_security_group" "ssh_access" {
 }
 
 resource "aws_instance" "devapp" {
-  ami           = "ami-04c08fd8aa14af291" # Amazon Linux 2023
+  ami           = "ami-04c08fd8aa14af291"
   instance_type = "t3.micro"
   key_name      = "ec2-key"
   security_groups = [aws_security_group.ssh_access.name]
@@ -48,7 +51,9 @@ resource "aws_instance" "devapp" {
       "sudo dnf update -y",
       "sudo dnf install docker -y",
       "sudo systemctl start docker",
-      "sudo systemctl enable docker"
+      "sudo systemctl enable docker",
+      "docker pull rahmam123/devapp",
+      "docker run -d --name devapp -p 80:3000 rahmam123/devapp"
     ]
 
     connection {
