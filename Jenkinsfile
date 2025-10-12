@@ -1,5 +1,6 @@
 pipeline {
-    agent any
+    agent { label 'windows' }
+
 
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Appliquer automatiquement après le plan Terraform ?')
