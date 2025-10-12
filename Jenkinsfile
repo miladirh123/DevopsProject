@@ -20,29 +20,39 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Plan') {
+        stage('Terraform Plan') {
             steps {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
+                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
+                        setlocal EnableDelayedExpansion
+                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+
+                        set PRIVATE_KEY_CONTENTS=
+                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
+                            set line=%%i
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
+                        )
+                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
+
                         cd terraform
                         terraform init -upgrade || exit /b 1
-                        terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                        -var="key_path=%EC2_KEY_PATH%" ^
-                                        -out=tfplan || exit /b 1
+                        terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -var="private_key=%PRIVATE_KEY_CONTENTS%" -out=tfplan || exit /b 1
                         terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
             }
         }
 
-        stage('Terraform Manual Approval') {
+        stage('Terraform Approval') {
             when {
-                not { equals expected: true, actual: params.autoApprove }
+                not {
+                    equals expected: true, actual: params.autoApprove
+                }
             }
             steps {
                 script {
@@ -58,14 +68,19 @@ pipeline {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
+                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
+                        setlocal EnableDelayedExpansion
+                        set PRIVATE_KEY_CONTENTS=
+                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
+                            set line=%%i
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
+                        )
+                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
+
                         cd terraform
-                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                        -var="key_path=%EC2_KEY_PATH%" ^
-                                        -input=false tfplan || exit /b 1
+                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -var="private_key=%PRIVATE_KEY_CONTENTS%" -input=false tfplan || exit /b 1
                         terraform output -raw ec2_public_ip > ec2_ip.txt
                     '''
                 }
@@ -74,14 +89,14 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                withCredentials([file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')]) {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY', usernameVariable: 'USER')
+                ]) {
                     script {
                         def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
                         bat """
-                            echo Deploiement sur ${ec2_ip}...
-                            pscp -i "%EC2_KEY_PATH%" docker-compose.yml ec2-user@${ec2_ip}:/home/ec2-user/
-                            plink -i "%EC2_KEY_PATH%" ec2-user@${ec2_ip} ^
-                                "docker-compose down || true && docker-compose up -d"
+                            ssh -i %KEY% %USER%@${ec2_ip} ^
+                                "docker pull %DOCKER_IMAGE% && docker stop devapp || true && docker rm devapp || true && docker run -d --name devapp -p 80:3000 %DOCKER_IMAGE%"
                         """
                     }
                 }
@@ -100,7 +115,7 @@ pipeline {
             echo '✅ Pipeline exécuté avec succès !'
         }
         failure {
-            echo '❌ Échec du pipeline. Vérifiez les logs Terraform ou SSH.'
+            echo '❌ Échec du pipeline. Vérifiez les logs.'
         }
     }
 }
