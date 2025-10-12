@@ -28,12 +28,20 @@ pipeline {
                     file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
                     bat '''
+                        setlocal EnableDelayedExpansion
+                        set PRIVATE_KEY_CONTENTS=
+                        for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
+                            set line=%%i
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
+                        )
+                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
+
                         cd terraform
                         terraform init -upgrade || exit /b 1
                         terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                        -var="key_path=%EC2_KEY_PATH%" ^
-                                        -out=tfplan || exit /b 1
+                                       -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
+                                       -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
+                                       -out=tfplan || exit /b 1
                         terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
@@ -61,10 +69,18 @@ pipeline {
                     file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
                     bat '''
+                        setlocal EnableDelayedExpansion
+                        set PRIVATE_KEY_CONTENTS=
+                        for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
+                            set line=%%i
+                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!^
+                        )
+                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
+
                         cd terraform
                         terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
                                         -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                        -var="key_path=%EC2_KEY_PATH%" ^
+                                        -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
                                         -input=false tfplan || exit /b 1
                         terraform output -raw ec2_public_ip > ec2_ip.txt
                     '''
