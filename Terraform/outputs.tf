@@ -1,3 +1,3 @@
-output "ec2_public_ip" {
-  value = aws_instance.devapp.public_ip
+output "private_key_preview" {
+  value = substr(var.private_key, 0, 100)
 }
