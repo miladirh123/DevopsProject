@@ -14,47 +14,35 @@ pipeline {
 
     stages {
 
-        // 1️⃣ Checkout du code
         stage('Checkout Code') {
             steps {
                 git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
             }
         }
 
-        // 2️⃣ Terraform Init & Plan
-        stage('Terraform Plan') {
+        stage('Terraform Init & Plan') {
             steps {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    file(credentialsId: 'ec2-key-file', variable: 'KEY_FILE')
+                    file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
                     bat '''
-                        echo Initialisation de Terraform...
-                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
-                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-
                         cd terraform
-                        copy "%KEY_FILE%" ec2-key.pem
-
                         terraform init -upgrade || exit /b 1
-                        terraform plan ^
-                            -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                            -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                            -out=tfplan || exit /b 1
-
+                        terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
+                                        -var="key_path=%EC2_KEY_PATH%" ^
+                                        -out=tfplan || exit /b 1
                         terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
             }
         }
 
-        // 3️⃣ Validation manuelle (optionnelle)
-        stage('Terraform Approval') {
+        stage('Terraform Manual Approval') {
             when {
-                not {
-                    equals expected: true, actual: params.autoApprove
-                }
+                not { equals expected: true, actual: params.autoApprove }
             }
             steps {
                 script {
@@ -65,66 +53,41 @@ pipeline {
             }
         }
 
-        // 4️⃣ Terraform Apply
         stage('Terraform Apply') {
             steps {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    file(credentialsId: 'ec2-key-file', variable: 'KEY_FILE')
+                    file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')
                 ]) {
                     bat '''
-                        echo Application du plan Terraform...
-                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
-                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-
                         cd terraform
-                        copy "%KEY_FILE%" ec2-key.pem
-
-                        terraform apply ^
-                            -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                            -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                            -auto-approve || exit /b 1
-
+                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
+                                        -var="key_path=%EC2_KEY_PATH%" ^
+                                        -input=false tfplan || exit /b 1
                         terraform output -raw ec2_public_ip > ec2_ip.txt
                     '''
                 }
             }
         }
 
-        // 5️⃣ Analyse SonarQube
-        stage('SonarQube Analysis') {
-            steps {
-                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                    bat """
-                        set SONAR_TOKEN=%SONAR_TOKEN%
-                        "%SONAR_SCANNER_PATH%" ^
-                            -D"sonar.projectKey=%SONAR_PROJECT_KEY%" ^
-                            -D"sonar.sources=." ^
-                            -D"sonar.host.url=http://localhost:9000" ^
-                            -D"sonar.login=%SONAR_TOKEN%"
-                    """
-                }
-            }
-        }
-
-        // 6️⃣ Déploiement sur EC2
         stage('Deploy to EC2') {
             steps {
-                withCredentials([file(credentialsId: 'ec2-key-file', variable: 'KEY_FILE')]) {
+                withCredentials([file(credentialsId: 'ec2-key-file', variable: 'EC2_KEY_PATH')]) {
                     script {
                         def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
                         bat """
-                            echo Deploiement sur EC2: ${ec2_ip}
-                            pscp -i "%KEY_FILE%" -batch -scp app.js ec2-user@${ec2_ip}:/home/ec2-user/app.js
-                            ssh -i "%KEY_FILE%" ec2-user@${ec2_ip} "docker pull %DOCKER_IMAGE% && docker stop devapp || true && docker rm devapp || true && docker run -d --name devapp -p 80:3000 %DOCKER_IMAGE%"
+                            echo Deploiement sur ${ec2_ip}...
+                            pscp -i "%EC2_KEY_PATH%" docker-compose.yml ec2-user@${ec2_ip}:/home/ec2-user/
+                            plink -i "%EC2_KEY_PATH%" ec2-user@${ec2_ip} ^
+                                "docker-compose down || true && docker-compose up -d"
                         """
                     }
                 }
             }
         }
 
-        // 7️⃣ Notification
         stage('Notify') {
             steps {
                 echo '📢 Pipeline terminé. Application déployée sur EC2.'
@@ -137,7 +100,7 @@ pipeline {
             echo '✅ Pipeline exécuté avec succès !'
         }
         failure {
-            echo '❌ Échec du pipeline. Vérifiez les logs.'
+            echo '❌ Échec du pipeline. Vérifiez les logs Terraform ou SSH.'
         }
     }
 }
