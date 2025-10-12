@@ -30,8 +30,8 @@ pipeline {
                     bat '''
                         set LF=^
 
-                        rem (ligne vide ci-dessous pour créer un saut de ligne)
-                        
+                        rem (ligne vide ici pour créer un saut de ligne)
+
                         setlocal EnableDelayedExpansion
                         set PRIVATE_KEY_CONTENTS=
                         for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
@@ -75,8 +75,8 @@ pipeline {
                     bat '''
                         set LF=^
 
-                        rem (ligne vide ci-dessous pour créer un saut de ligne)
-                        
+                        rem (ligne vide ici pour créer un saut de ligne)
+
                         setlocal EnableDelayedExpansion
                         set PRIVATE_KEY_CONTENTS=
                         for /f "usebackq delims=" %%i in ("%EC2_KEY_PATH%") do (
