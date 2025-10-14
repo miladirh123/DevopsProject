@@ -3,115 +3,62 @@ pipeline {
 
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Appliquer automatiquement après le plan Terraform ?')
+        choice(name: 'action', choices: ['apply', 'destroy'], description: 'Choisir l’action à exécuter')
     }
 
     environment {
-        SONAR_PROJECT_KEY = 'node_app'
-        SONAR_SCANNER_PATH = 'C:\\sonar-scanner\\bin\\sonar-scanner.bat'
-        NODE_ENV = 'production'
-        DOCKER_IMAGE = 'rahmam123/devapp'
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')         // Ton identifiant AWS
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')     // Ton secret AWS
+        AWS_DEFAULT_REGION    = 'eu-west-2'                               // ✅ Région adaptée à ton AMI
     }
 
     stages {
-
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
+                git branch: 'main', url: 'https://github.com/miladirh123/DevopsProject.git' // ✅ Ton dépôt
             }
         }
 
-        /*stage('SonarQube Analysis') {
-            options {
-                timeout(time: 3, unit: 'MINUTES')
-            }
+        stage('Terraform Init') {
             steps {
-                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                    bat """
-                        %SONAR_SCANNER_PATH% ^
-                        -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
-                        -Dsonar.sources=. ^
-                        -Dsonar.host.url=http://localhost:9000 ^
-                        -Dsonar.login=%SONAR_TOKEN%
-                    """
-                }
+                sh 'terraform init'
             }
-        }*/
+        }
 
         stage('Terraform Plan') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
-                ]) {
-                    bat '''
-                        setlocal EnableDelayedExpansion
-                        set "PRIVATE_KEY_CONTENTS="
-
-                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
-                            set "line=%%i"
-                            set "PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n!"
-                        )
-
-                        endlocal & set "PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%"
-
-                        cd terraform
-                        terraform init -upgrade || exit /b 1
-                        terraform plan ^
-                            -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                            -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                            -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
-                            -out=tfplan || exit /b 1
-                        terraform show -no-color tfplan > tfplan.txt
-                    '''
-                }
+                sh '''
+                    terraform plan \
+                    -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
+                    -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+                    -out=tfplan
+                '''
+                sh 'terraform show -no-color tfplan > tfplan.txt'
             }
         }
 
-        stage('Terraform Approval') {
-            when {
-                not {
-                    equals expected: true, actual: params.autoApprove
-                }
-            }
+        stage('Terraform Apply / Destroy') {
             steps {
                 script {
-                    def plan = readFile 'terraform/tfplan.txt'
-                    input message: "Souhaitez-vous appliquer ce plan Terraform ?",
-                          parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
-                }
-            }
-        }
+                    if (params.action == 'apply') {
+                        if (!params.autoApprove) {
+                            def plan = readFile 'tfplan.txt'
+                            input message: "Souhaitez-vous appliquer ce plan Terraform ?",
+                            parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
+                        }
 
-        stage('Terraform Apply') {
-            steps {
-                bat '''
-                    cd terraform
-                    terraform apply -input=false tfplan || exit /b 1
-                    terraform output -raw ec2_public_ip > ec2_ip.txt
-                '''
-            }
-        }
-
-        stage('Deploy to EC2') {
-            steps {
-                withCredentials([
-                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY', usernameVariable: 'USER')
-                ]) {
-                    script {
-                        def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
-                        bat """
-                            ssh -o StrictHostKeyChecking=no -i %KEY% %USER%@${ec2_ip} ^
-                                "docker pull %DOCKER_IMAGE% && docker stop devapp || true && docker rm devapp || true && docker run -d --name devapp -p 80:3000 %DOCKER_IMAGE%"
-                        """
+                        sh 'terraform apply -input=false tfplan'
+                    } else if (params.action == 'destroy') {
+                        sh '''
+                            terraform destroy \
+                            -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
+                            -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+                            --auto-approve
+                        '''
+                    } else {
+                        error "Action invalide. Choisissez 'apply' ou 'destroy'."
                     }
                 }
-            }
-        }
-
-        stage('Notify') {
-            steps {
-                echo '📢 Pipeline terminé. Application déployée sur EC2.'
             }
         }
     }
