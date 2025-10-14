@@ -32,10 +32,10 @@ resource "aws_security_group" "ssh_access" {
 }
 
 resource "aws_instance" "devapp" {
-  ami           = "ami-04c08fd8aa14af291"
-  instance_type = "t3.micro"
-  key_name      = "ec2-key"
-  security_groups = [aws_security_group.ssh_access.name]
+  ami                    = "ami-04c08fd8aa14af291"
+  instance_type          = "t3.micro"
+  key_name               = "ec2-key"
+  vpc_security_group_ids = [aws_security_group.ssh_access.id] # ✅ correction ici
 
   root_block_device {
     volume_size = 8
