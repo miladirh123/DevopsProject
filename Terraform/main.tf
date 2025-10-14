@@ -77,14 +77,6 @@ resource "aws_instance" "devapp" {
   depends_on = [aws_security_group.ssh_http_access]
 }
 
-variable "aws_access_key" {
-  type = string
-}
 
-variable "aws_secret_key" {
-  type = string
-}
 
-output "ec2_public_ip" {
-  value = aws_instance.devapp.public_ip
-}
+
