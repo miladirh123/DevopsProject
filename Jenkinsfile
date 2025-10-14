@@ -19,23 +19,23 @@ pipeline {
                 git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/miladirh123/DevopsProject.git'
             }
         }
-stage('SonarQube Analysis') {
-    options {
-        timeout(time: 3, unit: 'MINUTES')
-    }
-    steps {
-        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-            bat """
-                %SONAR_SCANNER_PATH% ^
-                -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
-                -Dsonar.sources=. ^
-                -Dsonar.host.url=http://localhost:9000 ^
-                -Dsonar.login=%SONAR_TOKEN%
-            """
-        }
-    }
-}
 
+        /*stage('SonarQube Analysis') {
+            options {
+                timeout(time: 3, unit: 'MINUTES')
+            }
+            steps {
+                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                    bat """
+                        %SONAR_SCANNER_PATH% ^
+                        -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
+                        -Dsonar.sources=. ^
+                        -Dsonar.host.url=http://localhost:9000 ^
+                        -Dsonar.login=%SONAR_TOKEN%
+                    """
+                }
+            }
+        }*/
 
         stage('Terraform Plan') {
             steps {
@@ -45,10 +45,23 @@ stage('SonarQube Analysis') {
                     sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
                 ]) {
                     bat '''
-                        z
+                        setlocal EnableDelayedExpansion
+                        set "PRIVATE_KEY_CONTENTS="
+
+                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
+                            set "line=%%i"
+                            set "PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n!"
+                        )
+
+                        endlocal & set "PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%"
+
                         cd terraform
                         terraform init -upgrade || exit /b 1
-                        terraform plan -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -var="private_key=%PRIVATE_KEY_CONTENTS%" -out=tfplan || exit /b 1
+                        terraform plan ^
+                            -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                            -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
+                            -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
+                            -out=tfplan || exit /b 1
                         terraform show -no-color tfplan > tfplan.txt
                     '''
                 }
@@ -72,25 +85,11 @@ stage('SonarQube Analysis') {
 
         stage('Terraform Apply') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
-                ]) {
-                    bat '''
-                        setlocal EnableDelayedExpansion
-                        set PRIVATE_KEY_CONTENTS=
-                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
-                            set line=%%i
-                            set PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n!
-                        )
-                        endlocal & set PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%
-
-                        cd terraform
-                        terraform apply -var="aws_access_key=%AWS_ACCESS_KEY_ID%" -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" -var="private_key=%PRIVATE_KEY_CONTENTS%" -input=false tfplan || exit /b 1
-                        terraform output -raw ec2_public_ip > ec2_ip.txt
-                    '''
-                }
+                bat '''
+                    cd terraform
+                    terraform apply -input=false tfplan || exit /b 1
+                    terraform output -raw ec2_public_ip > ec2_ip.txt
+                '''
             }
         }
 
