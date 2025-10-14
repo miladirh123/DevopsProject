@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'windows' }
 
     parameters {
         booleanParam(
@@ -17,8 +17,6 @@ pipeline {
     }
 
     stages {
-
-        /* ---- STAGE 1: CLONE DU CODE ---- */
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
@@ -27,11 +25,8 @@ pipeline {
             }
         }
 
-        /* ---- STAGE 2: ANALYSE SONARQUBE ---- */
         stage('SonarQube Analysis') {
-            options {
-                timeout(time: 3, unit: 'MINUTES')
-            }
+            options { timeout(time: 3, unit: 'MINUTES') }
             steps {
                 withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
                     bat """
@@ -45,103 +40,59 @@ pipeline {
             }
         }
 
-        /* ---- STAGE 3: TERRAFORM PLAN ---- */
         stage('Terraform Plan') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
-                ]) {
-                    bat '''
-                        setlocal EnableDelayedExpansion
-                        set "PRIVATE_KEY_CONTENTS="
-
-                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
-                            set "line=%%i"
-                            set "PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n!"
-                        )
-
-                        endlocal & set "PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%"
-
-                        cd terraform
-                        terraform init -upgrade || exit /b 1
-                        terraform plan ^
-                            -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                            -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                            -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
-                            -out=tfplan || exit /b 1
-                        terraform show -no-color tfplan > tfplan.txt
-                    '''
-                }
-            }
-        }
-
-        /* ---- STAGE 4: APPROBATION MANUELLE ---- */
-        stage('Terraform Approval') {
-            when {
-                not { equals expected: true, actual: params.autoApprove }
-            }
-            steps {
-                script {
-                    def plan = readFile 'terraform/tfplan.txt'
-                    input message: "Souhaitez-vous appliquer ce plan Terraform ?",
-                          parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
-                }
-            }
-        }
-
-        /* ---- STAGE 5: TERRAFORM APPLY ---- */
-        stage('Terraform Apply') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE', usernameVariable: 'USER')
-                ]) {
-                    bat '''
-                        setlocal EnableDelayedExpansion
-                        set "PRIVATE_KEY_CONTENTS="
-                        for /f "usebackq delims=" %%i in ("%KEY_FILE%") do (
-                            set "line=%%i"
-                            set "PRIVATE_KEY_CONTENTS=!PRIVATE_KEY_CONTENTS!!line!\\n!"
-                        )
-                        endlocal & set "PRIVATE_KEY_CONTENTS=%PRIVATE_KEY_CONTENTS%"
-
-                        cd terraform
-                        terraform apply ^
-                            -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                            -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                            -var="private_key=%PRIVATE_KEY_CONTENTS%" ^
-                            -input=false tfplan || exit /b 1
-                        terraform output -raw ec2_public_ip > ec2_ip.txt
-                    '''
-                }
-            }
-        }
-
-        /* ---- STAGE 6: DEPLOIEMENT SUR EC2 ---- */
-        stage('Deploy to EC2') {
-            steps {
-                withCredentials([
-                    sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY', usernameVariable: 'USER')
-                ]) {
-                    script {
-                        def ec2_ip = readFile('terraform/ec2_ip.txt').trim()
-                        bat """
-                            echo 📦 Déploiement sur ${ec2_ip}...
-                            ssh -o StrictHostKeyChecking=no -i "%KEY%" %USER%@${ec2_ip} ^
-                                "docker pull %DOCKER_IMAGE% &&
-                                 docker stop devapp || true &&
-                                 docker rm devapp || true &&
-                                 docker run -d --name devapp -p 80:3000 %DOCKER_IMAGE%"
-                        """
+                dir('Terraform') {
+                    withCredentials([
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        bat '''
+                            terraform init -upgrade
+                            terraform plan -out=tfplan ^
+                                -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                                -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%"
+                            terraform show -no-color tfplan > tfplan.txt
+                        '''
                     }
                 }
             }
         }
 
-        /* ---- STAGE 7: NOTIFICATION ---- */
+        stage('Terraform Apply') {
+            steps {
+                dir('Terraform') {
+                    withCredentials([
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        bat '''
+                            terraform apply -auto-approve ^
+                                -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                                -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%"
+                            terraform output -raw ec2_public_ip > ec2_ip.txt
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                script {
+                    def ec2_ip = readFile('Terraform/ec2_ip.txt').trim()
+                    bat """
+                        echo 📦 Déploiement sur ${ec2_ip}...
+                        ssh -o StrictHostKeyChecking=no -i "C:/jenkins/keys/ec2-key.pem" ec2-user@${ec2_ip} ^
+                            "docker pull %DOCKER_IMAGE% &&
+                             docker stop devapp || true &&
+                             docker rm devapp || true &&
+                             docker run -d --name devapp -p 80:3000 %DOCKER_IMAGE%"
+                    """
+                }
+            }
+        }
+
         stage('Notify') {
             steps {
                 echo '📢 Pipeline terminé. Application déployée sur EC2.'
@@ -149,13 +100,8 @@ pipeline {
         }
     }
 
-    /* ---- POST EXECUTION ---- */
     post {
-        success {
-            echo '✅ Pipeline exécuté avec succès !'
-        }
-        failure {
-            echo '❌ Échec du pipeline. Vérifiez les logs Terraform ou SSH.'
-        }
+        success { echo '✅ Pipeline exécuté avec succès !' }
+        failure { echo '❌ Échec du pipeline. Vérifiez les logs Terraform ou SSH.' }
     }
 }
