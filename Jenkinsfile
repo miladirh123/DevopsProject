@@ -19,7 +19,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                bat 'terraform init'
             }
         }
 
@@ -29,13 +29,13 @@ pipeline {
                     string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
-                    sh '''
-                        terraform plan \
-                        -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
-                        -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+                    bat """
+                        terraform plan ^
+                        -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                        -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
                         -out=tfplan
-                    '''
-                    sh 'terraform show -no-color tfplan > tfplan.txt'
+                    """
+                    bat 'terraform show -no-color tfplan > tfplan.txt'
                 }
             }
         }
@@ -54,14 +54,14 @@ pipeline {
                                 parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
                             }
 
-                            sh 'terraform apply -input=false tfplan'
+                            bat 'terraform apply -input=false tfplan'
                         } else if (params.action == 'destroy') {
-                            sh '''
-                                terraform destroy \
-                                -var="aws_access_key=${AWS_ACCESS_KEY_ID}" \
-                                -var="aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
+                            bat """
+                                terraform destroy ^
+                                -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                                -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
                                 --auto-approve
-                            '''
+                            """
                         } else {
                             error "Action invalide. Choisissez 'apply' ou 'destroy'."
                         }
