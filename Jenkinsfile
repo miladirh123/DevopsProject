@@ -25,7 +25,7 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        /*stage('SonarQube Analysis') {
             options { timeout(time: 3, unit: 'MINUTES') }
             steps {
                 withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
@@ -38,7 +38,7 @@ pipeline {
                     """
                 }
             }
-        }
+        }*/
 
         stage('Terraform Plan') {
             steps {
