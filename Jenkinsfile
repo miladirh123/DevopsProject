@@ -51,3 +51,44 @@ pipeline {
                             if (!params.autoApprove) {
                                 def plan = readFile 'tfplan.txt'
                                 input message: "Souhaitez-vous appliquer ce plan Terraform ?",
+                                parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
+                            }
+
+                            bat 'terraform apply -input=false tfplan'
+                        } else if (params.action == 'destroy') {
+                            bat """
+                                terraform destroy ^
+                                -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
+                                -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
+                                --auto-approve
+                            """
+                        } else {
+                            error "Action invalide. Choisissez 'apply' ou 'destroy'."
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Afficher IP EC2') {
+            steps {
+                bat 'terraform output public_ip'
+            }
+        }
+
+        stage('Sauvegarder IP EC2') {
+            steps {
+                bat 'terraform output -raw public_ip > ec2_ip.txt'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline exécuté avec succès !'
+        }
+        failure {
+            echo '❌ Échec du pipeline. Vérifiez les logs.'
+        }
+    }
+}
