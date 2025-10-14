@@ -16,8 +16,10 @@ provider "aws" {
 resource "aws_instance" "public_instance" {
   ami           = var.ami
   instance_type = var.instance_type
-  key_name      = "ec2-key" # Assure-toi que cette clé existe dans AWS
+  key_name      = "ec2-key" # Remplace par ta vraie clé SSH AWS
   tags = {
     Name = var.name_tag
   }
 }
+
+

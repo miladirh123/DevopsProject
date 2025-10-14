@@ -26,8 +26,8 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 withCredentials([
-                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     bat """
                         terraform plan ^
@@ -43,40 +43,11 @@ pipeline {
         stage('Terraform Apply / Destroy') {
             steps {
                 withCredentials([
-                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     script {
                         if (params.action == 'apply') {
                             if (!params.autoApprove) {
                                 def plan = readFile 'tfplan.txt'
                                 input message: "Souhaitez-vous appliquer ce plan Terraform ?",
-                                parameters: [text(name: 'Plan', description: 'Veuillez examiner le plan Terraform', defaultValue: plan)]
-                            }
-
-                            bat 'terraform apply -input=false tfplan'
-                        } else if (params.action == 'destroy') {
-                            bat """
-                                terraform destroy ^
-                                -var="aws_access_key=%AWS_ACCESS_KEY_ID%" ^
-                                -var="aws_secret_key=%AWS_SECRET_ACCESS_KEY%" ^
-                                --auto-approve
-                            """
-                        } else {
-                            error "Action invalide. Choisissez 'apply' ou 'destroy'."
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo '✅ Pipeline exécuté avec succès !'
-        }
-        failure {
-            echo '❌ Échec du pipeline. Vérifiez les logs.'
-        }
-    }
-}
